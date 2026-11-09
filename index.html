@@ -431,3 +431,228 @@ function chatComplete(messages, opts){
     throw e;
   });
 }
+
+var audioBlob = null, audioName = '';
+var mediaRec = null, recChunks = [], recTimer = null, recSec = 0;
+
+function setSrc(m){
+  $('rec-pane').classList.toggle('hide', m !== 'rec');
+  $('up-pane').classList.toggle('hide', m !== 'up');
+  $('src-rec').setAttribute('aria-pressed', m === 'rec' ? 'true' : 'false');
+  $('src-up').setAttribute('aria-pressed', m === 'up' ? 'true' : 'false');
+}
+$('src-rec').addEventListener('click', function(){ setSrc('rec'); });
+$('src-up').addEventListener('click', function(){ setSrc('up'); });
+
+function readyToTranscribe(msg){
+  setStatus($('asr-status'), msg, 'ok');
+  $('in-trans').classList.add('hide');
+  $('btn-gen').disabled = true;
+}
+
+$('btn-rec').addEventListener('click', function(){
+  var b = $('btn-rec');
+  if (mediaRec && mediaRec.state === 'recording'){ mediaRec.stop(); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    setStatus($('asr-status'), 'Browser ini nggak support rekam mic.', 'err'); return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream){
+    recChunks = []; recSec = 0;
+    mediaRec = new MediaRecorder(stream);
+    mediaRec.ondataavailable = function(e){ if (e.data && e.data.size) recChunks.push(e.data); };
+    mediaRec.onstop = function(){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      clearInterval(recTimer);
+      audioBlob = new Blob(recChunks, { type: mediaRec.mimeType || 'audio/webm' });
+      audioName = 'rekaman.webm';
+      b.textContent = 'Mulai rekam';
+      $('rec-time').textContent = '';
+      $('rec-done').classList.remove('hide');
+      $('rec-audio').src = URL.createObjectURL(audioBlob);
+      readyToTranscribe('Rekaman ' + fmtDur(recSec) + ' siap ditranskrip.');
+    };
+    mediaRec.start();
+    b.textContent = 'Stop';
+    $('rec-done').classList.add('hide');
+    recTimer = setInterval(function(){
+      recSec++;
+      $('rec-time').textContent = fmtDur(recSec);
+    }, 1000);
+  }).catch(function(){
+    setStatus($('asr-status'), 'Izin mic ditolak atau nggak ada mic.', 'err');
+  });
+});
+
+$('in-audio').addEventListener('change', function(){
+  var f = this.files[0];
+  if (!f) return;
+  if (f.size > 25 * 1048576){
+    setStatus($('asr-status'), 'File-nya kebesaran (maks 25 MB).', 'err');
+    this.value = '';
+    return;
+  }
+  audioBlob = f;
+  audioName = f.name;
+  $('up-info').textContent = f.name + ' (' + (f.size / 1048576).toFixed(1) + ' MB)';
+  readyToTranscribe('File siap ditranskrip. Tekan "Mulai transkrip".');
+});
+
+$('btn-asr').addEventListener('click', function(){
+  if (!audioBlob){
+    setStatus($('asr-status'), 'Rekam atau pilih audionya dulu.', 'err');
+    return;
+  }
+  var st = $('asr-status');
+  var btn = this;
+  btn.disabled = true;
+  setStatus(st, 'Membaca audio\u2026', 'wait');
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var ac = new AC();
+  audioBlob.arrayBuffer()
+    .then(function(buf){
+      return ac.decodeAudioData(buf);
+    })
+    .then(function(ab){
+      return ac.close().then(function(){ return resample16k(ab); });
+    })
+    .then(function(pcm){
+      var chunkSec = 25;
+      var perChunk = 16000 * chunkSec;
+      var total = Math.ceil(pcm.length / perChunk);
+      var texts = [];
+      var i = 0;
+      function next(){
+        if (i >= total){
+          var full = texts.join(' ').replace(/\s+/g, ' ').trim();
+          btn.disabled = false;
+          if (!full){
+            setStatus(st, 'Transkripnya kosong. Coba cek audionya.', 'err');
+            return;
+          }
+          $('in-trans').classList.remove('hide');
+          $('in-trans').value = full;
+          $('btn-gen').disabled = false;
+          setStatus(st, 'Transkrip kelar, ' + total + ' bagian (' + full.length + ' karakter). '
+            + 'Cek dulu, ada salah dengar bisa dibetulin langsung.', 'ok');
+          return;
+        }
+        setStatus(st, 'Transkrip bagian ' + (i + 1) + '/' + total + '\u2026', 'wait');
+        var slice = pcm.subarray(i * perChunk, Math.min((i + 1) * perChunk, pcm.length));
+        var form = new FormData();
+        form.append('file', wavBlob(slice), 'bagian' + i + '.wav');
+        form.append('model', cfg.asrModel);
+        return fetch(cfg.base + '/audio/transcriptions', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + cfg.key },
+          body: form
+        }).then(function(r){
+          return r.json().catch(function(){ return {}; });
+        }).then(function(j){
+          if (j.text){ texts.push(j.text); i++; return next(); }
+          if (j.error){
+            var e = new Error('ASR: ' + (j.error.message || JSON.stringify(j.error)));
+            e.code = j.error.code;
+            throw e;
+          }
+          throw new Error('Balasan ASR nggak jelas.');
+        });
+      }
+      return next();
+    })
+    .catch(function(err){
+      btn.disabled = false;
+      setStatus(st, (err && err.message) ? err.message : 'Gagal memproses audio.', 'err');
+    });
+});
+
+function resample16k(ab){
+  var off = new OfflineAudioContext(1, Math.max(1, Math.ceil(ab.duration * 16000)), 16000);
+  var src = off.createBufferSource();
+  src.buffer = ab;
+  src.connect(off.destination);
+  src.start();
+  return off.startRendering().then(function(r){
+    return r.getChannelData(0).slice();
+  });
+}
+
+function wavBlob(f32){
+  var n = f32.length;
+  var buf = new ArrayBuffer(44 + n * 2);
+  var v = new DataView(buf);
+  function str(o, s){ for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+  str(0, 'RIFF');
+  v.setUint32(4, 36 + n * 2, true);
+  str(8, 'WAVE');
+  str(12, 'fmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, 16000, true);
+  v.setUint32(28, 32000, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  str(36, 'data');
+  v.setUint32(40, n * 2, true);
+  for (var i = 0; i < n; i++){
+    var s = Math.max(-1, Math.min(1, f32[i]));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+$('in-doc').addEventListener('change', function(){
+  var f = this.files[0];
+  if (!f) return;
+  if (/\.pdf$/i.test(f.name)){ extractPdf(f); return; }
+  f.text().then(function(t){
+    appendMateri(t);
+    $('doc-info').textContent = f.name + ' dimuat (' + t.length + ' karakter).';
+  });
+});
+function appendMateri(t){
+  if (!t.trim()) return;
+  var cur = $('in-materi').value;
+  $('in-materi').value = cur ? cur + '\n\n' + t.trim() : t.trim();
+}
+function extractPdf(f){
+  $('doc-info').textContent = 'Membaca PDF\u2026';
+  loadScript('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js').then(function(){
+    var pdfjs = window.pdfjsLib;
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    return f.arrayBuffer().then(function(buf){
+      return pdfjs.getDocument({ data: buf }).promise;
+    }).then(function(doc){
+      var pages = [];
+      var p = 1;
+      function nxt(){
+        if (p > doc.numPages){
+          var t = pages.join('\n\n');
+          appendMateri(t);
+          $('doc-info').textContent = f.name + ': ' + doc.numPages + ' halaman, '
+            + t.length + ' karakter. Digabung ke kolom materi.';
+          return;
+        }
+        $('doc-info').textContent = 'Membaca PDF halaman ' + p + '/' + doc.numPages + '\u2026';
+        return doc.getPage(p++).then(function(pg){
+          return pg.getTextContent();
+        }).then(function(tc){
+          pages.push(tc.items.map(function(it){ return it.str; }).join(' '));
+          return nxt();
+        });
+      }
+      return nxt();
+    });
+  }).catch(function(){
+    $('doc-info').textContent = 'Gagal baca PDF (loader butuh internet). Tempel teksnya manual aja.';
+  });
+}
+function loadScript(src){
+  return new Promise(function(res, rej){
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function(){ res(); };
+    s.onerror = function(){ rej(new Error('gagal load ' + src)); };
+    document.head.appendChild(s);
+  });
+}
