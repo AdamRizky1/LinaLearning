@@ -875,3 +875,111 @@ function setTab(name){
 $('tab-modul').addEventListener('click', function(){ setTab('modul'); });
 $('tab-slide').addEventListener('click', function(){ setTab('slide'); });
 $('tab-quiz').addEventListener('click', function(){ setTab('quiz'); });
+
+var foc = { camOn: false, stream: null, faceOk: null, faceAvail: false, prevFace: null, loop: null, faceLoop: null };
+var TICK_MS = 5000;
+
+function startFocus(){
+  foc.camOn = false;
+  foc.faceOk = null;
+  foc.prevFace = null;
+  foc.loop = setInterval(focusTick, TICK_MS);
+  document.addEventListener('visibilitychange', onVisChange);
+  updateFocusUI();
+}
+function stopFocus(){
+  if (foc.loop){ clearInterval(foc.loop); foc.loop = null; }
+  if (foc.faceLoop){ clearInterval(foc.faceLoop); foc.faceLoop = null; }
+  document.removeEventListener('visibilitychange', onVisChange);
+  stopCam();
+}
+function onVisChange(){
+  if (!session) return;
+  if (document.hidden) session.tabInt++;
+  updateFocusUI();
+}
+function focusTick(){
+  if (!session) return;
+  var ok = document.visibilityState === 'visible' && (!foc.camOn || foc.faceOk === true);
+  if (ok) session.focusTicks++;
+  else session.distractTicks++;
+  updateFocusUI();
+}
+$('btn-cam').addEventListener('click', function(){
+  if (foc.camOn){
+    stopCam();
+    updateFocusUI();
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    setStatus($('face-status'), 'Browser ini nggak support webcam.', 'err');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 }, audio: false })
+    .then(function(stream){
+      foc.stream = stream;
+      foc.camOn = true;
+      $('cam').srcObject = stream;
+      $('cam').classList.remove('hide');
+      $('camoff').classList.add('hide');
+      $('btn-cam').textContent = 'Matikan kamera';
+      setStatus($('face-status'), 'deteksi wajah: ngeload model\u2026', 'wait');
+      loadFaceModels();
+      foc.faceLoop = setInterval(faceCheck, 4000);
+    })
+    .catch(function(){
+      setStatus($('face-status'), 'Izin kamera ditolak atau nggak ada webcam.', 'err');
+    });
+});
+function stopCam(){
+  if (foc.stream){
+    foc.stream.getTracks().forEach(function(t){ t.stop(); });
+    foc.stream = null;
+  }
+  foc.camOn = false;
+  foc.faceOk = null;
+  foc.prevFace = null;
+  if (foc.faceLoop){ clearInterval(foc.faceLoop); foc.faceLoop = null; }
+  $('cam').classList.add('hide');
+  $('camoff').classList.remove('hide');
+  $('btn-cam').textContent = 'Nyalakan kamera';
+  setStatus($('face-status'), 'deteksi wajah: kamera mati');
+}
+function loadFaceModels(){
+  if (foc.faceAvail) return;
+  loadScript('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/dist/face-api.min.js')
+    .then(function(){
+      return window.faceapi.nets.tinyFaceDetector
+        .loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights');
+    })
+    .then(function(){
+      foc.faceAvail = true;
+      setStatus($('face-status'), 'deteksi wajah siap.');
+    })
+    .catch(function(){
+      setStatus($('face-status'),
+        'Model wajah gagal dimuat (butuh internet). Fokus dihitung dari tab aja.', 'err');
+    });
+}
+function faceCheck(){
+  if (!foc.camOn || !foc.faceAvail || !window.faceapi) return;
+  var opts = new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 });
+  Promise.resolve(window.faceapi.detectSingleFace($('cam'), opts)).then(function(res){
+    var has = !!res;
+    if (session && foc.prevFace === true && !has) session.faceInt++;
+    foc.prevFace = has;
+    foc.faceOk = has;
+    updateFocusUI();
+  }).catch(function(){});
+}
+function updateFocusUI(){
+  if (!session) return;
+  var tot = session.focusTicks + session.distractTicks;
+  $('st-focus').textContent = tot ? Math.round(session.focusTicks / tot * 100) + '%' : '\u2013';
+  $('st-tab').textContent = session.tabInt;
+  $('st-face').textContent = session.faceInt;
+  if (foc.camOn && foc.faceAvail){
+    if (foc.faceOk === true) setStatus($('face-status'), 'wajah kelihatan.');
+    else if (foc.faceOk === false) setStatus($('face-status'), 'wajah nggak kelihatan.');
+  }
+}
