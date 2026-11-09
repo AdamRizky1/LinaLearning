@@ -202,3 +202,46 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.5 ui-monospace,Menlo,Con
     <table class="histlist" id="hist"></table>
   </div>
 </section>
+
+<section id="screen-study" class="hide">
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-top:26px">
+    <h2 id="study-title" style="margin:0"></h2>
+    <span class="note pill-count" id="study-time"></span>
+    <button class="btn" id="btn-finish" type="button" style="margin-left:auto">Selesai belajar</button>
+  </div>
+
+  <div class="focusstrip">
+    <div class="camwrap">
+      <video id="cam" class="hide" muted playsinline width="168" height="126"></video>
+      <div class="camoff" id="camoff">kamera mati</div>
+    </div>
+    <div style="min-width:200px">
+      <button class="btn2" id="btn-cam" type="button">Nyalakan kamera</button>
+      <p class="status" id="face-status">deteksi wajah: kamera mati</p>
+    </div>
+    <div class="statsrow" style="margin-left:auto">
+      <div><div class="lbl">Fokus</div><div class="big pill-count" id="st-focus">&ndash;</div></div>
+      <div><div class="lbl">Pindah tab</div><div class="big pill-count" id="st-tab">0</div></div>
+      <div><div class="lbl">Wajah hilang</div><div class="big pill-count" id="st-face">0</div></div>
+    </div>
+  </div>
+  <p class="note" style="margin-top:8px">Skor fokus dihitung tiap 5 detik: dihitung fokus kalau tab-nya
+    kebuka, dan kalau kamera nyala, wajahnya juga ke-cekung. Pindah tab atau wajah ilang dihitung gangguan.</p>
+
+  <div class="tabs" role="tablist" aria-label="Bahan belajar">
+    <button role="tab" id="tab-modul" aria-selected="true" type="button">Modul</button>
+    <button role="tab" id="tab-slide" aria-selected="false" type="button">Slide</button>
+    <button role="tab" id="tab-quiz" aria-selected="false" type="button">Kuis</button>
+  </div>
+  <div id="pane-modul" role="tabpanel" aria-labelledby="tab-modul" class="modul" style="padding-top:14px"></div>
+  <div id="pane-slide" role="tabpanel" aria-labelledby="tab-slide" class="hide" style="padding-top:14px">
+    <div class="slidebox" id="slidebox"></div>
+    <div class="slidenav">
+      <button class="btn2" id="sl-prev" type="button">&#8249; Sebelumnya</button>
+      <span class="cnt pill-count" id="sl-cnt"></span>
+      <button class="btn2" id="sl-next" type="button">Berikutnya &#8250;</button>
+    </div>
+    <p class="note">Bisa juga pakai tombol panah kiri/kanan di keyboard.</p>
+  </div>
+  <div id="pane-quiz" role="tabpanel" aria-labelledby="tab-quiz" class="hide" style="padding-top:14px"></div>
+</section>
