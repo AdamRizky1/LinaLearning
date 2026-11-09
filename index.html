@@ -656,3 +656,102 @@ function loadScript(src){
     document.head.appendChild(s);
   });
 }
+
+var sessionTimeLoop = null;
+
+$('btn-gen').addEventListener('click', function(){
+  var trans = $('in-trans').value.trim();
+  if (!trans){
+    setStatus($('gen-status'), 'Transkripnya masih kosong.', 'err');
+    return;
+  }
+  var materi = $('in-materi').value.trim();
+  var st = $('gen-status');
+  var btn = this;
+  btn.disabled = true;
+  setStatus(st, 'Nyusun modul, slide, sama kuis. Ini butuh 1\u20132 menit, jangan ditutup halamannya.', 'wait');
+  var sys = 'Kamu guru di Indonesia yang merangkum pelajaran jadi bahan belajar siswa. '
+    + 'Balas HANYA JSON valid tanpa penjelasan lain, tanpa markdown, dengan bentuk: '
+    + '{"judul":string,"ringkasan":string,"modul":[{"judul":string,"isi":string,"poin":[string]}],'
+    + '"slide":[{"judul":string,"isi":[string],"catatan":string}],'
+    + '"kuis":[{"tanya":string,"pilihan":[string,string,string,string],"jawaban":0,"jelas":string}]} '
+    + 'Kolom "isi" boleh beberapa paragraf, pisahkan dengan dua newline. "jawaban" adalah index pilihan '
+    + 'yang benar (0-3). Buat 4-6 bagian modul, 8-12 slide, dan 8 soal kuis. '
+    + 'Pakai bahasa Indonesia yang jelas dan enak dibaca siswa. '
+    + 'Kalau ada materi tambahan, gabungkan isinya dan patuhi materi tersebut.';
+  var usr = 'TRANSKRIP:\n' + trans + (materi ? '\n\nMATERI TAMBAHAN:\n' + materi : '');
+  chatComplete(
+    [{ role: 'system', content: sys }, { role: 'user', content: usr }],
+    { temperature: 0.4, maxTokens: 8192 }
+  ).then(function(raw){
+    var data = parseLesson(raw);
+    if (!data || !Array.isArray(data.modul) || !Array.isArray(data.slide) || !Array.isArray(data.kuis)
+        || !data.modul.length){
+      throw new Error('JSON dari model nggak lengkap. Coba lagi, kalau masih gitu ganti model di pengaturan.');
+    }
+    startSession(data, trans);
+  }).catch(function(err){
+    setStatus(st, explainErr(err), 'err');
+    btn.disabled = false;
+  });
+});
+
+function parseLesson(raw){
+  var s = String(raw).replace(/```(json)?/g, '');
+  var a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try { return JSON.parse(s.slice(a, b + 1)); } catch(e){ return null; }
+}
+
+function startSession(data, trans){
+  session = {
+    data: data,
+    trans: trans,
+    startedAt: Date.now(),
+    focusTicks: 0,
+    distractTicks: 0,
+    tabInt: 0,
+    faceInt: 0,
+    answers: [],
+    quizDone: false
+  };
+  renderModule(data);
+  renderSlides(data);
+  renderQuiz(data);
+  setTab('modul');
+  $('study-title').textContent = data.judul || 'Sesi belajar';
+  setStatus($('gen-status'), '');
+  $('btn-gen').disabled = false;
+  show('screen-study');
+  startFocus();
+  tickTime();
+}
+
+function tickTime(){
+  if (sessionTimeLoop) clearTimeout(sessionTimeLoop);
+  if (!session || $('screen-study').classList.contains('hide')){
+    sessionTimeLoop = null;
+    return;
+  }
+  $('study-time').textContent = fmtDur((Date.now() - session.startedAt) / 1000) + ' berjalan';
+  sessionTimeLoop = setTimeout(tickTime, 1000);
+}
+
+function renderModule(data){
+  var h = '';
+  if (data.ringkasan) h += '<p class="note">' + esc(data.ringkasan) + '</p>';
+  (data.modul || []).forEach(function(m, i){
+    h += (i ? '<hr class="rule">' : '')
+      + '<h2 style="margin-top:' + (i ? '22px' : '10px') + '">'
+      + esc(m.judul || ('Bagian ' + (i + 1))) + '</h2>';
+    String(m.isi || '').split(/\n{2,}/).forEach(function(par){
+      if (par.trim()) h += '<p>' + esc(par.trim()) + '</p>';
+    });
+    if (m.poin && m.poin.length){
+      h += '<p style="margin-bottom:4px"><b>Poin penting:</b></p><ul>';
+      m.poin.forEach(function(p){ h += '<li>' + esc(p) + '</li>'; });
+      h += '</ul>';
+    }
+  });
+  $('pane-modul').innerHTML = h;
+}
