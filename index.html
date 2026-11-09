@@ -755,3 +755,123 @@ function renderModule(data){
   });
   $('pane-modul').innerHTML = h;
 }
+
+var slideData = [], slideIdx = 0, quizData = [], quizIdx = 0;
+
+function renderSlides(data){
+  slideData = data.slide || [];
+  slideIdx = 0;
+  drawSlide();
+}
+function drawSlide(){
+  var s = slideData[slideIdx];
+  if (!s){
+    $('slidebox').innerHTML = '<p class="note">Nggak ada slide.</p>';
+    $('sl-cnt').textContent = '';
+    $('sl-prev').disabled = true;
+    $('sl-next').disabled = true;
+    return;
+  }
+  var h = '<h2>' + esc(s.judul || '') + '</h2><ul>';
+  (s.isi || []).forEach(function(b){ h += '<li>' + esc(b) + '</li>'; });
+  h += '</ul>';
+  if (s.catatan) h += '<p class="note">' + esc(s.catatan) + '</p>';
+  $('slidebox').innerHTML = h;
+  $('sl-cnt').textContent = (slideIdx + 1) + ' / ' + slideData.length;
+  $('sl-prev').disabled = slideIdx === 0;
+  $('sl-next').disabled = slideIdx === slideData.length - 1;
+}
+$('sl-prev').addEventListener('click', function(){
+  if (slideIdx > 0){ slideIdx--; drawSlide(); }
+});
+$('sl-next').addEventListener('click', function(){
+  if (slideIdx < slideData.length - 1){ slideIdx++; drawSlide(); }
+});
+document.addEventListener('keydown', function(e){
+  if ($('screen-study').classList.contains('hide')) return;
+  if ($('pane-slide').classList.contains('hide')) return;
+  if (document.activeElement && /input|textarea/i.test(document.activeElement.tagName)) return;
+  if (e.key === 'ArrowLeft') $('sl-prev').click();
+  if (e.key === 'ArrowRight') $('sl-next').click();
+});
+
+function renderQuiz(data){
+  quizData = data.kuis || [];
+  quizIdx = 0;
+  if (session) session.answers = [];
+  drawQuiz();
+}
+function drawQuiz(){
+  var box = $('pane-quiz');
+  if (!quizData.length){
+    box.innerHTML = '<p class="note">Nggak ada soal.</p>';
+    return;
+  }
+  if (quizIdx >= quizData.length){
+    var benar = session ? session.answers.filter(function(a){ return a.benar; }).length : 0;
+    if (session) session.quizDone = true;
+    var msg;
+    if (benar === quizData.length) msg = 'Sempurna, semua bener.';
+    else if (benar >= Math.ceil(quizData.length * 0.7)) msg = 'Lumayan bagus. Yang salah dibaca lagi bagiannya.';
+    else msg = 'Sepertinya perlu baca modulnya lagi, terus coba kuisnya sekali lagi.';
+    box.innerHTML = '<div class="slidebox" style="align-items:flex-start">'
+      + '<h2>Skor kuis: ' + benar + '/' + quizData.length + '</h2>'
+      + '<p>' + msg + ' Jawaban per soal kelihatan di laporan akhir.</p>'
+      + '<button class="btn2" id="quiz-retry" type="button" style="margin-top:10px">Ulangi kuis</button></div>';
+    $('quiz-retry').addEventListener('click', function(){
+      quizIdx = 0;
+      if (session) session.answers = [];
+      drawQuiz();
+    });
+    return;
+  }
+  var q = quizData[quizIdx];
+  var h = '<p class="note">Soal ' + (quizIdx + 1) + '/' + quizData.length + '</p>'
+    + '<h2 style="max-width:60ch">' + esc(q.tanya || '') + '</h2>';
+  (q.pilihan || []).forEach(function(opt, i){
+    h += '<button class="quiz-opt" type="button" data-i="' + i + '">' + esc(opt) + '</button>';
+  });
+  h += '<div id="quiz-explain" class="explain hide"></div>';
+  box.innerHTML = h;
+  var answered = false;
+  Array.prototype.forEach.call(box.querySelectorAll('.quiz-opt'), function(btn){
+    btn.addEventListener('click', function(){
+      if (answered) return;
+      answered = true;
+      var pick = parseInt(btn.getAttribute('data-i'), 10);
+      var right = typeof q.jawaban === 'number' ? q.jawaban : parseInt(q.jawaban, 10) || 0;
+      if (session) session.answers.push({
+        tanya: q.tanya, pilih: pick, benar: pick === right, jelas: q.jelas || ''
+      });
+      Array.prototype.forEach.call(box.querySelectorAll('.quiz-opt'), function(b2, i){
+        b2.disabled = true;
+        if (i === right) b2.classList.add('right');
+        else if (i === pick) b2.classList.add('wrong');
+      });
+      var ex = $('quiz-explain');
+      ex.classList.remove('hide');
+      ex.textContent = (pick === right ? 'Benar. ' : 'Kurang tepat. ') + (q.jelas || '');
+      var nb = document.createElement('button');
+      nb.className = 'btn';
+      nb.type = 'button';
+      nb.style.marginTop = '12px';
+      nb.textContent = quizIdx === quizData.length - 1 ? 'Lihat skor' : 'Soal berikutnya';
+      nb.addEventListener('click', function(){
+        quizIdx++;
+        drawQuiz();
+      });
+      box.appendChild(nb);
+    });
+  });
+}
+
+function setTab(name){
+  [['tab-modul','pane-modul'],['tab-slide','pane-slide'],['tab-quiz','pane-quiz']].forEach(function(p){
+    var on = p[0] === 'tab-' + name;
+    $(p[0]).setAttribute('aria-selected', on ? 'true' : 'false');
+    $(p[1]).classList.toggle('hide', !on);
+  });
+}
+$('tab-modul').addEventListener('click', function(){ setTab('modul'); });
+$('tab-slide').addEventListener('click', function(){ setTab('slide'); });
+$('tab-quiz').addEventListener('click', function(){ setTab('quiz'); });
