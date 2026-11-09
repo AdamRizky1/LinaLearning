@@ -267,3 +267,167 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.5 ui-monospace,Menlo,Con
 </section>
 
 </div>
+
+<div class="overlay hide" id="ov-settings">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="set-title">
+    <h3 id="set-title">Pengaturan API</h3>
+    <label for="cfg-base">Base URL (OpenAI-compatible)</label>
+    <input type="text" id="cfg-base">
+    <label for="cfg-key">API key</label>
+    <input type="password" id="cfg-key" autocomplete="off">
+    <label for="cfg-chat">Model teks (modul / slide / kuis)</label>
+    <input type="text" id="cfg-chat">
+    <label for="cfg-asr">Model ASR (suara ke teks)</label>
+    <input type="text" id="cfg-asr">
+    <label for="cfg-proxy">Proxy buat chat (opsional)</label>
+    <input type="text" id="cfg-proxy" placeholder="https://proxy.example.com?url=">
+    <p class="note">Endpoint chat di api.z.ai belum ngirim header preflight CORS, jadi request generate
+      modul bisa keblokir browser. Kalau gagal dengan error jaringan padahal tes transkrip jalan,
+      isi proxy di atas (misal cors-anywhere yang kamu deploy sendiri) atau pakai provider lain
+      yang support browser seperti OpenRouter.</p>
+    <div class="row2">
+      <button class="btn" id="cfg-save" type="button">Simpan</button>
+      <button class="btn2" id="cfg-test" type="button">Tes koneksi</button>
+      <button class="btn2" id="cfg-logout" type="button">Ganti profil</button>
+      <button class="btn2" id="cfg-close" type="button">Tutup</button>
+    </div>
+    <p class="status" id="cfg-status" role="status"></p>
+  </div>
+</div>
+
+<script>
+'use strict';
+var DEFAULT_CONFIG = {
+  base: 'https://api.z.ai/api/paas/v4',
+  key: 'kn-28b4e80cdd6d01fcd04f18ebe4a589d3dc9cb04f48d65912',
+  chatModel: 'glm-4.6',
+  asrModel: 'glm-asr-2512',
+  chatProxy: ''
+};
+
+function loadJSON(k, fb){
+  try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; }catch(e){ return fb; }
+}
+function saveJSON(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
+var cfg = Object.assign({}, DEFAULT_CONFIG, loadJSON('lina_config', {}));
+var profile = loadJSON('lina_profile', null);
+var histList = loadJSON('lina_history', []);
+var session = null;
+
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function show(id){
+  ['screen-setup','screen-home','screen-study','screen-report'].forEach(function(s){
+    $(s).classList.toggle('hide', s !== id);
+  });
+  window.scrollTo(0, 0);
+}
+function setStatus(el, msg, cls){
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+function fmtDur(sec){
+  sec = Math.max(0, Math.round(sec));
+  var m = Math.floor(sec / 60), s = sec % 60;
+  return m + ' mnt ' + (s < 10 ? '0' : '') + s + ' dtk';
+}
+function fmtDate(ts){
+  var d = new Date(ts);
+  return d.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) +
+    ', ' + d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+}
+
+$('form-setup').addEventListener('submit', function(e){
+  e.preventDefault();
+  var nama = $('in-nama').value.trim(), ortu = $('in-ortu').value.trim();
+  if (!nama || !ortu) return;
+  profile = { nama: nama, ortu: ortu };
+  saveJSON('lina_profile', profile);
+  enterHome();
+});
+
+$('btn-settings').addEventListener('click', openSettings);
+$('cfg-close').addEventListener('click', function(){ $('ov-settings').classList.add('hide'); });
+function openSettings(){
+  $('cfg-base').value = cfg.base;
+  $('cfg-key').value = cfg.key;
+  $('cfg-chat').value = cfg.chatModel;
+  $('cfg-asr').value = cfg.asrModel;
+  $('cfg-proxy').value = cfg.chatProxy || '';
+  setStatus($('cfg-status'), '');
+  $('ov-settings').classList.remove('hide');
+}
+$('cfg-save').addEventListener('click', function(){
+  cfg.base = $('cfg-base').value.trim().replace(/\/+$/, '');
+  cfg.key = $('cfg-key').value.trim();
+  cfg.chatModel = $('cfg-chat').value.trim() || DEFAULT_CONFIG.chatModel;
+  cfg.asrModel = $('cfg-asr').value.trim() || DEFAULT_CONFIG.asrModel;
+  cfg.chatProxy = $('cfg-proxy').value.trim();
+  saveJSON('lina_config', cfg);
+  setStatus($('cfg-status'), 'Tersimpan.', 'ok');
+});
+$('cfg-logout').addEventListener('click', function(){
+  localStorage.removeItem('lina_profile');
+  profile = null;
+  $('ov-settings').classList.add('hide');
+  show('screen-setup');
+});
+$('cfg-test').addEventListener('click', function(){
+  $('cfg-save').click();
+  var el = $('cfg-status');
+  setStatus(el, 'Ngetes koneksi\u2026', 'wait');
+  chatComplete([{ role:'user', content:'Balas satu kata saja: siap' }], { maxTokens: 512, temperature: 0.1 })
+    .then(function(t){
+      setStatus(el, 'Koneksi oke, model balas: ' + t.trim().slice(0, 60), 'ok');
+    })
+    .catch(function(err){ setStatus(el, explainErr(err), 'err'); });
+});
+
+function explainErr(err){
+  if (err && err.cors){
+    return 'Request keblokir browser (CORS). Endpoint chat di base URL ini nggak ngirim header '
+      + 'preflight. Isi kolom proxy di pengaturan, atau pakai provider yang support browser.';
+  }
+  if (err && err.code === 401) return 'API key ditolak (401, token expired or incorrect). Cek lagi key-nya di pengaturan.';
+  if (err && err.code === 404) return 'Model atau endpoint nggak ketemu (404). Cek nama model sama base URL.';
+  if (err && err.code === 429) return 'Kena limit (429). Tunggu sebentar, coba lagi.';
+  return (err && err.message) ? err.message : 'Gagal manggil API.';
+}
+
+function chatUrl(){
+  if (cfg.chatProxy) return cfg.chatProxy + encodeURIComponent(cfg.base + '/chat/completions');
+  return cfg.base + '/chat/completions';
+}
+function chatComplete(messages, opts){
+  opts = opts || {};
+  return fetch(chatUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+    body: JSON.stringify({
+      model: cfg.chatModel,
+      messages: messages,
+      temperature: opts.temperature == null ? 0.4 : opts.temperature,
+      max_tokens: opts.maxTokens || 8192
+    })
+  }).then(function(res){
+    return res.json().catch(function(){ return {}; }).then(function(j){
+      if (!res.ok){
+        var e = new Error((j.error && j.error.message) || ('HTTP ' + res.status));
+        e.code = res.status;
+        throw e;
+      }
+      var c = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (!c) throw new Error('Balasan API kosong atau bentuknya beda dari yang diperkirakan.');
+      return c;
+    });
+  }, function(){
+    var e = new Error('network');
+    e.cors = true;
+    throw e;
+  });
+}
