@@ -372,6 +372,9 @@ $('cfg-save').addEventListener('click', function(){
   setStatus($('cfg-status'), 'Tersimpan.', 'ok');
 });
 $('cfg-logout').addEventListener('click', function(){
+  session = null;
+  if (typeof foc !== 'undefined' && foc.loop) stopFocus();
+  if (sessionTimeLoop){ clearTimeout(sessionTimeLoop); sessionTimeLoop = null; }
   localStorage.removeItem('lina_profile');
   profile = null;
   $('ov-settings').classList.add('hide');
@@ -561,7 +564,11 @@ $('btn-asr').addEventListener('click', function(){
     })
     .catch(function(err){
       btn.disabled = false;
-      setStatus(st, (err && err.message) ? err.message : 'Gagal memproses audio.', 'err');
+      var msg = (err && err.message) ? err.message : 'Gagal memproses audio.';
+      if (/decode|EncodingError/i.test(msg + ' ' + ((err && err.name) || ''))){
+        msg = 'Format audionya nggak bisa dibaca browser. Coba wav/mp3/m4a/webm/ogg yang valid.';
+      }
+      setStatus(st, msg, 'err');
     });
 });
 
@@ -880,6 +887,7 @@ var foc = { camOn: false, stream: null, faceOk: null, faceAvail: false, prevFace
 var TICK_MS = 5000;
 
 function startFocus(){
+  if (foc.loop) stopFocus();
   foc.camOn = false;
   foc.faceOk = null;
   foc.prevFace = null;
@@ -989,6 +997,7 @@ var currentReport = null;
 $('btn-finish').addEventListener('click', finishSession);
 
 function finishSession(){
+  if (!session) return;
   var dur = Math.round((Date.now() - session.startedAt) / 1000);
   var tot = session.focusTicks + session.distractTicks;
   var rep = {
