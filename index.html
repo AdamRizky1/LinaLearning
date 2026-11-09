@@ -983,3 +983,191 @@ function updateFocusUI(){
     else if (foc.faceOk === false) setStatus($('face-status'), 'wajah nggak kelihatan.');
   }
 }
+
+var currentReport = null;
+
+$('btn-finish').addEventListener('click', finishSession);
+
+function finishSession(){
+  var dur = Math.round((Date.now() - session.startedAt) / 1000);
+  var tot = session.focusTicks + session.distractTicks;
+  var rep = {
+    ts: Date.now(),
+    judul: session.data.judul || 'Sesi belajar',
+    durasi: dur,
+    fokus: tot ? Math.round(session.focusTicks / tot * 100) : null,
+    tab: session.tabInt,
+    wajah: session.faceInt,
+    benar: session.answers.filter(function(a){ return a.benar; }).length,
+    soal: session.answers.length,
+    ringkasan: session.data.ringkasan || '',
+    trans: session.trans
+  };
+  histList.unshift(rep);
+  histList = histList.slice(0, 20);
+  saveJSON('lina_history', histList);
+  stopFocus();
+  if (sessionTimeLoop){ clearTimeout(sessionTimeLoop); sessionTimeLoop = null; }
+  currentReport = rep;
+  session = null;
+  showReport(rep);
+}
+
+function reportText(rep){
+  return [
+    'Laporan belajar ' + profile.nama,
+    'Tanggal   : ' + fmtDate(rep.ts),
+    'Materi    : ' + rep.judul,
+    'Durasi    : ' + fmtDur(rep.durasi),
+    'Skor fokus: ' + (rep.fokus == null ? '-' : rep.fokus + '%'),
+    'Gangguan  : pindah tab ' + rep.tab + 'x, wajah hilang dari kamera ' + rep.wajah + 'x',
+    'Kuis      : ' + rep.benar + ' benar dari ' + rep.soal + ' soal',
+    '',
+    'Ringkasan materi:',
+    rep.ringkasan
+  ].join('\n');
+}
+
+function repRows(rep){
+  return '<tr><th>Materi</th><td>' + esc(rep.judul) + '</td></tr>'
+    + '<tr><th>Durasi belajar</th><td>' + fmtDur(rep.durasi) + '</td></tr>'
+    + '<tr><th>Skor fokus</th><td>' + (rep.fokus == null ? '-' : rep.fokus + '%') + '</td></tr>'
+    + '<tr><th>Gangguan</th><td>pindah tab ' + rep.tab + 'x, wajah hilang ' + rep.wajah + 'x</td></tr>'
+    + '<tr><th>Skor kuis</th><td>' + rep.benar + ' benar dari ' + rep.soal + ' soal</td></tr>'
+    + '<tr><th>Ringkasan materi</th><td>' + esc(rep.ringkasan) + '</td></tr>';
+}
+
+function showReport(rep){
+  $('rep-head').textContent = profile.nama + ' \u2014 ' + fmtDate(rep.ts);
+  $('rep-table').innerHTML = repRows(rep);
+  $('rep-trans').textContent = rep.trans || '(kosong)';
+  $('lnk-gmail').href = 'https://mail.google.com/mail/?view=cm&fs=1&to='
+    + encodeURIComponent(profile.ortu)
+    + '&su=' + encodeURIComponent('Laporan belajar ' + profile.nama + ' \u2014 ' + fmtDate(rep.ts))
+    + '&body=' + encodeURIComponent(reportText(rep).slice(0, 1500));
+  setStatus($('send-status'), '');
+  $('send-note').textContent = 'Kirim pertama ke email orang tua bakal diminta aktivasi sekali sama '
+    + 'FormSubmit (cek folder spam juga). Alternatif tanpa daftar: tombol "Buka di Gmail".';
+  show('screen-report');
+}
+
+$('btn-send').addEventListener('click', function(){
+  var rep = currentReport;
+  if (!rep) return;
+  var st = $('send-status');
+  setStatus(st, 'Mengirim\u2026', 'wait');
+  fetch('https://formsubmit.co/ajax/' + encodeURIComponent(profile.ortu), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({
+      name: 'LinaLearning',
+      _subject: 'Laporan belajar ' + profile.nama + ' \u2014 ' + fmtDate(rep.ts),
+      message: reportText(rep)
+    })
+  }).then(function(r){
+    return r.json();
+  }).then(function(j){
+    if (j.success === 'true' || j.success === true){
+      setStatus(st, 'Terkirim ke ' + profile.ortu + '. Kalau ini kirim pertama, orang tua '
+        + 'harus konfirmasi aktivasi dari email FormSubmit dulu.', 'ok');
+    } else {
+      throw new Error(j.message || 'FormSubmit nolak request-nya.');
+    }
+  }).catch(function(e){
+    setStatus(st, 'Gagal kirim: ' + e.message + ' \u2014 coba tombol "Buka di Gmail".', 'err');
+  });
+});
+
+$('btn-copy').addEventListener('click', function(){
+  if (!currentReport) return;
+  navigator.clipboard.writeText(reportText(currentReport)).then(function(){
+    setStatus($('send-status'), 'Laporan dikopi ke clipboard.', 'ok');
+  }, function(){
+    setStatus($('send-status'), 'Browser nggak izinkan akses clipboard.', 'err');
+  });
+});
+
+$('btn-dl').addEventListener('click', function(){
+  var rep = currentReport;
+  if (!rep) return;
+  var html = '<!doctype html><html lang="id"><head><meta charset="utf-8">'
+    + '<title>Laporan ' + esc(profile.nama) + '</title><style>'
+    + 'body{font:15px/1.6 Georgia,serif;max-width:660px;margin:40px auto;padding:0 18px;color:#211d16}'
+    + 'table{border-collapse:collapse;width:100%}th,td{border:1px solid #d9d3c3;padding:7px 10px;text-align:left;vertical-align:top}'
+    + 'th{background:#f2ecdb;width:180px}h1{font-size:22px}'
+    + 'pre{white-space:pre-wrap;background:#f7f5ef;padding:12px;border:1px solid #d9d3c3;font:13px/1.5 ui-monospace,monospace}'
+    + '</style></head><body>'
+    + '<h1>Laporan belajar \u2014 ' + esc(profile.nama) + '</h1>'
+    + '<p>' + esc(fmtDate(rep.ts)) + '</p>'
+    + '<table>' + repRows(rep) + '</table>'
+    + '<h2>Transkrip</h2><pre>' + esc(rep.trans || '(kosong)') + '</pre>'
+    + '</body></html>';
+  var url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'laporan-belajar-' + rep.ts + '.html';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+});
+
+$('btn-new').addEventListener('click', function(){
+  session = null;
+  currentReport = null;
+  enterHome();
+});
+
+function renderHistory(){
+  if (!histList.length){
+    $('hist-sec').classList.add('hide');
+    return;
+  }
+  $('hist-sec').classList.remove('hide');
+  var h = '';
+  histList.forEach(function(r){
+    h += '<tr><td>' + esc(fmtDate(r.ts)) + '</td><td>' + esc(r.judul) + '</td><td>'
+      + (r.fokus == null ? '-' : r.fokus + '%') + '</td><td>kuis ' + r.benar + '/' + r.soal + '</td></tr>';
+  });
+  $('hist').innerHTML = h;
+}
+
+function resetHome(){
+  $('who').innerHTML = '<b>' + esc(profile.nama) + '</b> \u00b7 ortu: ' + esc(profile.ortu);
+  $('hello').textContent = 'Halo, ' + profile.nama + '. Rekam atau upload pelajarannya, '
+    + 'nanti diubah jadi modul, slide, sama kuis.';
+  $('secure-warn').classList.toggle('hide', !!window.isSecureContext);
+  audioBlob = null;
+  audioName = '';
+  $('rec-done').classList.add('hide');
+  $('rec-audio').removeAttribute('src');
+  $('btn-rec').textContent = 'Mulai rekam';
+  $('rec-time').textContent = '';
+  $('in-audio').value = '';
+  $('up-info').textContent = '';
+  $('in-materi').value = '';
+  $('in-doc').value = '';
+  $('doc-info').textContent = '';
+  $('in-trans').value = '';
+  $('in-trans').classList.add('hide');
+  $('btn-gen').disabled = true;
+  $('btn-asr').disabled = false;
+  setStatus($('asr-status'), '');
+  setStatus($('gen-status'), '');
+  renderHistory();
+}
+
+function enterHome(){
+  resetHome();
+  show('screen-home');
+}
+
+function init(){
+  if (!window.isSecureContext) $('ctx-warn').classList.remove('hide');
+  if (!profile) show('screen-setup');
+  else enterHome();
+}
+init();
+</script>
+</body>
+</html>
