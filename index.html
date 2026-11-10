@@ -1329,7 +1329,7 @@ $('tab-slide').addEventListener('click', function(){ setTab('slide'); });
 $('tab-quiz').addEventListener('click', function(){ setTab('quiz'); });
 
 var foc = { camOn: false, stream: null, faceOk: null, faceAvail: false, prevFace: null, loop: null, faceLoop: null,
-            camLost: false, deadStreak: 0 };
+            camLost: false, deadStreak: 0, lastErr: null };
 var camReqTok = 0; // penanda permintaan getUserMedia biar klik ganda nggak bocorkan stream
 var TICK_MS = 5000;
 
@@ -1371,13 +1371,15 @@ function focusTick(){
   updateFocusUI();
 }
 // Kamera ketutup/dimatiin paksa/track-nya mati → wajah pasti ilang, jangan nyangkut nilai lama.
-function faceLost(){
+// msg boleh dispesifikin pemicunya (track mati / frame item / frame beku) biar
+// pengguna tahu BENERAN kenapa — bukan vonis blanket "kamera berhenti".
+function faceLost(msg){
+  foc.lastErr = msg || 'kamera berhenti/tertutup — sementara dihitung nggak fokus.';
   if (session && foc.prevFace === true) session.faceInt++;
   foc.prevFace = false;
   foc.faceOk = false;
   updateFocusUI();
-  if (foc.camOn) setStatus($('face-status'),
-    'kamera berhenti/tertutup — sementara dihitung nggak fokus.', 'err');
+  if (foc.camOn) setStatus($('face-status'), foc.lastErr, 'err');
 }
 $('btn-cam').addEventListener('click', function(){
   if (foc.camOn){
@@ -1442,6 +1444,7 @@ function stopCam(){
   foc.faceOk = null;
   foc.prevFace = null;
   foc.deadStreak = 0;
+  foc.lastErr = null;
   framePrev = null;
   if (foc.faceLoop){ clearInterval(foc.faceLoop); foc.faceLoop = null; }
   $('cam').srcObject = null;
@@ -1482,6 +1485,7 @@ function loadFaceModels(){
 // noise sensor + auto-exposure, jadi penilaian hidup/mati pakai DUA sinyal:
 //   std   = seberapa bervariasi terang di dalam 1 frame (frame tertutup → ~0)
 //   moved = seberapa banyak piksel berubah vs cek sebelumnya (frame beku → ~0)
+//   mean  = kecerahan rata-rata (buat bedain "kamar gelap" vs "lensa tertutup")
 var frameCv = null;
 var framePrev = null;
 function frameStatus(){
@@ -1503,14 +1507,15 @@ function frameStatus(){
     }
     var mean = sum / n;
     var std = Math.sqrt(Math.max(0, sum2 / n - mean * mean));
+    var hadPrev = !!(framePrev && framePrev.length === n);
     var moved = 0;
-    if (framePrev && framePrev.length === n){
+    if (hadPrev){
       var ch = 0, j;
-      for (j = 0; j < n; j++) if (Math.abs(cur[j] - framePrev[j]) > 2) ch++;
+      for (j = 0; j < n; j++) if (Math.abs(cur[j] - framePrev[j]) >= 1) ch++;
       moved = ch / n;
     }
     framePrev = cur;
-    return { ready: true, std: std, moved: moved };
+    return { ready: true, std: std, moved: moved, mean: mean, first: !hadPrev };
   } catch(e){ return { ready: false }; }
 }
 function faceCheck(){
@@ -1528,15 +1533,32 @@ function faceCheck(){
   var trackOk = !!tr && tr.readyState === 'live' && !tr.muted;
   // 2) Frame-nya beneran ada isinya (bukan item/beku karena kamera ketutup fisik)?
   var fs = frameStatus();
-  var frameOk = trackOk && fs.ready && (fs.std > 2.5 || fs.moved > 0.01);
+  // Cek pertama (belum ada pembanding) pakai variasi dalam frame; cek berikutnya
+  // pakai perubahan antar frame — kamera hidup SELALU punya noise/mikro-gerak
+  // (nilainya > 0), frame beku pas 0. Ini penangkal anti-cheat sekaligus
+  // anti "kamar gelap salah dilapor mati".
+  var frameOk = trackOk && fs.ready &&
+    (fs.first ? fs.std > 2.5
+              : (fs.moved > 0.02 || (fs.std > 2.5 && fs.moved > 0.002)));
   // 3) Debounce: satu cek jelek (frame gelap sesaat, exposure lagi naik, dll.) bukan
-  //    berarti mati — wajib gagal 2x berturut-turut (±8 detik) baru dinyatakan berhenti.
+  //    berarti mati — wajib gagal 2x berturut-turut (±8 detik) baru dinyatakan bermasalah.
   if (!trackOk || !frameOk){
     foc.deadStreak++;
-    if (foc.deadStreak >= 2) faceLost();
+    if (foc.deadStreak >= 2){
+      // Vonisnya JUJUR per penyebab — biar pengguna nggak dikira-kira "kamera mati"
+      // padahal kamar gelap, lensa ketutup, atau kamera lagi dipakai app lain.
+      if (!trackOk) faceLost('kamera berhenti/terputus — sementara dihitung nggak fokus.');
+      else if (fs.ready && fs.mean < 15 && fs.std < 3)
+        faceLost('frame kamera item — lensa bisa ketutup, kamar gelap, atau kamera lagi dipakai aplikasi lain. Sementara dihitung nggak fokus.');
+      else if (fs.ready && fs.moved < 0.02)
+        faceLost('frame kamera beku (nggak berubah-ubah) — matikan lalu nyalakan lagi kameranya. Sementara dihitung nggak fokus.');
+      else
+        faceLost();
+    }
     return;
   }
   foc.deadStreak = 0;
+  foc.lastErr = null;
   var opts = new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 });
   Promise.resolve(window.faceapi.detectSingleFace($('cam'), opts)).then(function(res){
     var has = !!res;
@@ -1560,7 +1582,8 @@ function updateFocusUI(){
   } else if (foc.camOn && foc.faceAvail){
     var trk = foc.stream ? foc.stream.getVideoTracks()[0] : null;
     var trkOk = !!trk && trk.readyState === 'live' && !trk.muted;
-    if (!trkOk) setStatus($('face-status'), 'kamera berhenti/tertutup — dihitung nggak fokus.', 'err');
+    if (!trkOk) setStatus($('face-status'),
+      foc.lastErr || 'kamera berhenti/tertutup — dihitung nggak fokus.', 'err');
     else if (foc.faceOk === true) setStatus($('face-status'), 'wajah kelihatan.');
     else if (foc.faceOk === false) setStatus($('face-status'), 'wajah nggak kelihatan.');
   }
