@@ -38,8 +38,15 @@ Semua bisa diubah di menu Pengaturan:
 
 - Base URL: https://kenari.id/v1
 - Key: format kn-... dari https://kenari.id/keys (tagihan Rupiah)
-- Model teks: glm-5-3-flash (pilihan cepat GPT 6 Luna, GLM 5.2,
-  DeepSeek V4.1 Flash muncul sebagai saran di Pengaturan)
+- Model modul & slide: glm-5-3-flash. Dipilih karena karakter benchmark-nya:
+  konteks 1M token (transkrip panjang + materi masuk semua), kemampuan resmi
+  menyusun dokumen terstruktur, dan harga output lebih murah
+- Model kuis: gpt-6-luna. Dipilih karena posisi benchmark-nya sebagai model
+  cepat untuk tugas terstruktur berulang (JSON, ekstraksi, klasifikasi) dengan
+  latensi rendah
+- Dua model itu jalan paralel pas menekan "Buat modul". Ganti kapan pun di
+  Pengaturan (kolom Model modul & slide / Model kuis); tombol "Tes koneksi"
+  mengetes dua-duanya sekaligus
 - Model ASR: whisper-large-v3-turbo
 
 Dua hal yang perlu diketahui:
