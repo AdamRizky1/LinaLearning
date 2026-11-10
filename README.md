@@ -32,20 +32,22 @@ lalu buka http://localhost:8000. Mau online? Upload index.html ke mana aja
 
 ## API
 
-Pakai endpoint Z.ai yang OpenAI-compatible. Semua bisa diubah di menu
-Pengaturan:
+Pakai Kenari (kenari.id), gateway LLM Indonesia yang OpenAI-compatible dan
+CORS-nya terbuka, jadi semua request aman langsung dari browser tanpa proxy.
+Semua bisa diubah di menu Pengaturan:
 
-- Base URL: https://api.z.ai/api/paas/v4
-- Model teks: glm-4.6
-- Model ASR: glm-asr-2512
+- Base URL: https://kenari.id/v1
+- Key: format kn-... dari https://kenari.id/keys (tagihan Rupiah)
+- Model teks: glm-5-3-flash
+- Model ASR: whisper-large-v3-turbo
 
 Dua hal yang perlu diketahui:
 
-1. Chat completions di api.z.ai (masih) nggak ngirim header preflight CORS,
-   jadi request generate modul bisa keblokir browser. Transkripsi
-   (audio/transcriptions) aman langsung dari browser. Solusinya isi kolom
-   proxy di Pengaturan (misal cors-anywhere yang kamu deploy sendiri) atau
-   pakai provider lain yang support browser.
+1. Kalau ganti ke provider lain yang nggak ngirim header preflight CORS
+   (misal chat completions di api.z.ai), request generate modul bisa
+   keblokir browser. Solusinya isi kolom proxy di Pengaturan (misal
+   cors-anywhere yang kamu deploy sendiri) atau pakai provider yang
+   support browser.
 2. Key yang nempel default di file ini punya pemilik repo, buat ngobrol
    langsung tanpa setup. Taruh key asli di repo publik itu resiko sendiri;
    rotate kalau keceplosan.

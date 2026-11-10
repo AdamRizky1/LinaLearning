@@ -392,10 +392,10 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
     <input type="text" id="cfg-asr">
     <label for="cfg-proxy">Proxy buat chat (opsional)</label>
     <input type="text" id="cfg-proxy" placeholder="https://proxy.example.com?url=">
-    <p class="note">Endpoint chat di api.z.ai belum ngirim header preflight CORS, jadi request generate
-      modul bisa keblokir browser. Kalau gagal dengan error jaringan padahal tes transkrip jalan,
-      isi proxy di atas (misal cors-anywhere yang kamu deploy sendiri) atau pakai provider lain
-      yang support browser seperti OpenRouter.</p>
+    <p class="note">Default memakai Kenari (kenari.id), gateway OpenAI-compatible dengan CORS
+      terbuka, jadi aman dipanggil langsung dari browser tanpa proxy. Kolom proxy cuma perlu diisi
+      kalau ganti ke provider lain yang keblokir browser (misal cors-anywhere yang kamu deploy
+      sendiri).</p>
     <div class="row2">
       <button class="btn" id="cfg-save" type="button">Simpan</button>
       <button class="btn2" id="cfg-test" type="button">Tes koneksi</button>
@@ -409,10 +409,11 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
 <script>
 'use strict';
 var DEFAULT_CONFIG = {
-  base: 'https://api.z.ai/api/paas/v4',
+  cfgVer: 2,
+  base: 'https://kenari.id/v1',
   key: 'kn-28b4e80cdd6d01fcd04f18ebe4a589d3dc9cb04f48d65912',
-  chatModel: 'glm-4.6',
-  asrModel: 'glm-asr-2512',
+  chatModel: 'glm-5-3-flash',
+  asrModel: 'whisper-large-v3-turbo',
   chatProxy: ''
 };
 
@@ -420,7 +421,12 @@ function loadJSON(k, fb){
   try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; }catch(e){ return fb; }
 }
 function saveJSON(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
-var cfg = Object.assign({}, DEFAULT_CONFIG, loadJSON('lina_config', {}));
+var storedCfg = loadJSON('lina_config', {});
+// Pengaturan lama (versi beda, mis. masih nunjuk ke api.z.ai) dibuang otomatis
+// supaya semua browser langsung pakai default yang baru tanpa hapus manual.
+var cfg = (storedCfg && storedCfg.cfgVer === DEFAULT_CONFIG.cfgVer)
+  ? Object.assign({}, DEFAULT_CONFIG, storedCfg)
+  : Object.assign({}, DEFAULT_CONFIG);
 var profile = loadJSON('lina_profile', null);
 var histList = loadJSON('lina_history', []);
 var session = null;
@@ -479,6 +485,7 @@ $('cfg-save').addEventListener('click', function(){
   cfg.chatModel = $('cfg-chat').value.trim() || DEFAULT_CONFIG.chatModel;
   cfg.asrModel = $('cfg-asr').value.trim() || DEFAULT_CONFIG.asrModel;
   cfg.chatProxy = $('cfg-proxy').value.trim();
+  cfg.cfgVer = DEFAULT_CONFIG.cfgVer;
   saveJSON('lina_config', cfg);
   setStatus($('cfg-status'), 'Tersimpan.', 'ok');
 });
