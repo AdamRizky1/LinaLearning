@@ -387,9 +387,20 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
     <label for="cfg-key">API key</label>
     <input type="password" id="cfg-key" autocomplete="off">
     <label for="cfg-chat">Model teks (modul / slide / kuis)</label>
-    <input type="text" id="cfg-chat">
+    <input type="text" id="cfg-chat" list="chat-model-list">
+    <datalist id="chat-model-list">
+      <option value="glm-5-3-flash">GLM 5.3 Flash — hemat, default</option>
+      <option value="gpt-6-luna">GPT 6 Luna — OpenAI, harga sekelas GLM Flash</option>
+      <option value="glm-5-2">GLM 5.2 — kualitas lebih tinggi</option>
+      <option value="deepseek-v4-1-flash">DeepSeek V4.1 Flash — paling murah</option>
+    </datalist>
     <label for="cfg-asr">Model ASR (suara ke teks)</label>
-    <input type="text" id="cfg-asr">
+    <input type="text" id="cfg-asr" list="asr-model-list">
+    <datalist id="asr-model-list">
+      <option value="whisper-large-v3-turbo">Whisper large-v3-turbo — akurat, default</option>
+      <option value="whisper-1">Whisper 1 — standar</option>
+      <option value="gpt-transcribe">GPT Transcribe</option>
+    </datalist>
     <label for="cfg-proxy">Proxy buat chat (opsional)</label>
     <input type="text" id="cfg-proxy" placeholder="https://proxy.example.com?url=">
     <p class="note">Default memakai Kenari (kenari.id), gateway OpenAI-compatible dengan CORS

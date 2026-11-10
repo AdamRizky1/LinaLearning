@@ -38,7 +38,8 @@ Semua bisa diubah di menu Pengaturan:
 
 - Base URL: https://kenari.id/v1
 - Key: format kn-... dari https://kenari.id/keys (tagihan Rupiah)
-- Model teks: glm-5-3-flash
+- Model teks: glm-5-3-flash (pilihan cepat GPT 6 Luna, GLM 5.2,
+  DeepSeek V4.1 Flash muncul sebagai saran di Pengaturan)
 - Model ASR: whisper-large-v3-turbo
 
 Dua hal yang perlu diketahui:
