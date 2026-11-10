@@ -13,7 +13,10 @@ Satu file aja (index.html), nggak ada build step.
   dipecah per 30 detik sesuai batas endpoint ASR, dire-encode jadi wav 16 kHz,
   lalu hasilnya digabung jadi satu transkrip.
 - Materi tambahan opsional: tempel teks atau load file txt/pdf.
-- Generate modul, slide, dan kuis dari transkrip + materi.
+- Generate modul, slide, dan kuis dari transkrip + materi tambahan. Salah satu
+  sumber aja udah cukup: bisa dari transkrip saja (tanpa materi), atau dari
+  materi tulisan saja (tanpa rekaman audio sama sekali). Kalau dua-duanya ada,
+  digabung: transkrip jadi sumber utama, materi dipatuhi.
 - Focus counter: tiap 5 detik dihitung fokus kalau tab kebuka dan, kalau
   kamera nyala, wajah ke-deteksi. Pindah tab dan wajah hilang dihitung
   gangguan.
