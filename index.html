@@ -323,7 +323,7 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
 
   <div class="focusstrip">
     <div class="camwrap">
-      <video id="cam" class="hide" muted playsinline width="168" height="126"></video>
+      <video id="cam" class="hide" muted playsinline autoplay width="168" height="126"></video>
       <div class="camoff" id="camoff">kamera mati</div>
     </div>
     <div style="min-width:200px">
@@ -1328,14 +1328,18 @@ $('tab-modul').addEventListener('click', function(){ setTab('modul'); });
 $('tab-slide').addEventListener('click', function(){ setTab('slide'); });
 $('tab-quiz').addEventListener('click', function(){ setTab('quiz'); });
 
-var foc = { camOn: false, stream: null, faceOk: null, faceAvail: false, prevFace: null, loop: null, faceLoop: null };
+var foc = { camOn: false, stream: null, faceOk: null, faceAvail: false, prevFace: null, loop: null, faceLoop: null,
+            camLost: false, deadStreak: 0 };
+var camReqTok = 0; // penanda permintaan getUserMedia biar klik ganda nggak bocorkan stream
 var TICK_MS = 5000;
 
 function startFocus(){
   if (foc.loop) stopFocus();
   foc.camOn = false;
+  foc.camLost = false;
   foc.faceOk = null;
   foc.prevFace = null;
+  foc.deadStreak = 0;
   foc.loop = setInterval(focusTick, TICK_MS);
   document.addEventListener('visibilitychange', onVisChange);
   updateFocusUI();
@@ -1357,7 +1361,10 @@ function focusTick(){
   // Kalau model gagal load, kita janjiin "fokus dihitung dari tab aja" — nah, jangan sampai
   // semua tick malah kehitung gangguan. Kalau kamera nyala tapi wajah/kameranya ilang
   // (ketutup, laptop ditutup), itu dihitung gangguan, BUKAN fokus.
-  var faceMatters = foc.camOn && foc.faceAvail;
+  // Kamera mati karena pilihan pengguna (tombol) → bebas, fokus dihitung dari tab.
+  // Kamera mati KARENA DICABUT/mati sendiri (camLost) → tetap dihitung gangguan
+  // sampai pengguna nyalain lagi. Nggak boleh dapet nilai fokus gratisan.
+  var faceMatters = (foc.camOn || foc.camLost) && foc.faceAvail;
   var ok = document.visibilityState === 'visible' && (!faceMatters || foc.faceOk === true);
   if (ok) session.focusTicks++;
   else session.distractTicks++;
@@ -1382,43 +1389,77 @@ $('btn-cam').addEventListener('click', function(){
     setStatus($('face-status'), 'Browser ini nggak support webcam.', 'err');
     return;
   }
+  var myTok = ++camReqTok;
   navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 }, audio: false })
     .then(function(stream){
+      // Izin keluar pas pengguna udah batal/sudah klik lagi → stop langsung, jangan
+      // bocorkan stream (lampu LED kamera bisa nyala sendiri gara-gara ini).
+      if (myTok !== camReqTok){
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        return;
+      }
+      if (foc.stream) foc.stream.getTracks().forEach(function(t){ t.stop(); });
       foc.stream = stream;
       foc.camOn = true;
+      foc.camLost = false;
+      foc.deadStreak = 0;
+      framePrev = null;
       $('cam').srcObject = stream;
       $('cam').classList.remove('hide');
       $('camoff').classList.add('hide');
       $('btn-cam').textContent = 'Matikan kamera';
+      // srcObject doang belum tentu muter di semua browser: video bisa ke-pause
+      // selamanya → preview item padahal track hidup → canvas baca frame item →
+      // keliru dilaporkan "kamera berhenti". Play() eksplisit itu wajib.
+      var pp = $('cam').play();
+      if (pp && pp.catch) pp.catch(function(){});
       setStatus($('face-status'), 'deteksi wajah: ngeload model\u2026', 'wait');
       loadFaceModels();
       foc.faceLoop = setInterval(faceCheck, 4000);
       // Kalau laptop ditutup/kamera dicabut, track-nya jadi 'ended' atau 'mute' —
       // elemen <video>-nya masih nampilin frame terakhir yang beku, jadi wajib kita tangkep
-      // di sini biar nggak dianggap masih fokus.
+      // di sini biar nggak dianggap masih fokus. 'ended' = mati beneran (UI balik ke
+      // kondisi mati), 'mute' = terinterupsi (masih mungkin pulih).
       var vt = stream.getVideoTracks()[0];
       if (vt){
-        vt.addEventListener('ended', faceLost);
+        vt.addEventListener('ended', cameraDied);
         vt.addEventListener('mute', faceLost);
       }
     })
     .catch(function(){
+      if (myTok !== camReqTok) return;
       setStatus($('face-status'), 'Izin kamera ditolak atau nggak ada webcam.', 'err');
     });
 });
 function stopCam(){
+  camReqTok++; // batalin permintaan getUserMedia yang masih ngantre (kalau ada)
   if (foc.stream){
     foc.stream.getTracks().forEach(function(t){ t.stop(); });
     foc.stream = null;
   }
   foc.camOn = false;
+  foc.camLost = false;
   foc.faceOk = null;
   foc.prevFace = null;
+  foc.deadStreak = 0;
+  framePrev = null;
   if (foc.faceLoop){ clearInterval(foc.faceLoop); foc.faceLoop = null; }
+  $('cam').srcObject = null;
   $('cam').classList.add('hide');
   $('camoff').classList.remove('hide');
   $('btn-cam').textContent = 'Nyalakan kamera';
   setStatus($('face-status'), 'deteksi wajah: kamera mati');
+}
+// Kamera mati dari LUAR (dicabut, dimatiin OS, track 'ended') → bukan pilihan pengguna.
+// UI wajib balik ke kondisi mati beneran (tombol "Nyalakan kamera", preview ilang),
+// dan tick selama kameranya belum dinyalain lagi dihitung gangguan, bukan fokus.
+function cameraDied(){
+  stopCam();
+  foc.camLost = true;
+  foc.faceOk = null;
+  setStatus($('face-status'),
+    'kamera mati/dicabut — klik "Nyalakan kamera" buat lanjut deteksi.', 'err');
+  updateFocusUI();
 }
 function loadFaceModels(){
   if (foc.faceAvail) return;
@@ -1436,13 +1477,17 @@ function loadFaceModels(){
         'Model wajah gagal dimuat (butuh internet). Fokus dihitung dari tab aja.', 'err');
     });
 }
-// Frame kamera ketutup fisik (stiker, tangan, lid) hampir rata warnanya — cek variasi terang
-// frame-nya. Wajah/ruangan beneran variasinya jauh lebih besar daripada frame tertutup.
+// Frame kamera ketutup fisik (stiker, tangan, lid) hampir rata warnanya DAN beku
+// (nggak berubah antar cek). Kamera hidup di ruangan gelap pun tetap "gerak" gara-gara
+// noise sensor + auto-exposure, jadi penilaian hidup/mati pakai DUA sinyal:
+//   std   = seberapa bervariasi terang di dalam 1 frame (frame tertutup → ~0)
+//   moved = seberapa banyak piksel berubah vs cek sebelumnya (frame beku → ~0)
 var frameCv = null;
-function frameHasSignal(){
+var framePrev = null;
+function frameStatus(){
   try{
     var v = $('cam');
-    if (!v.videoWidth) return false;
+    if (!v.videoWidth) return { ready: false };
     if (!frameCv){
       frameCv = document.createElement('canvas');
       frameCv.width = 32; frameCv.height = 24;
@@ -1451,28 +1496,47 @@ function frameHasSignal(){
     cx.drawImage(v, 0, 0, 32, 24);
     var d = cx.getImageData(0, 0, 32, 24).data;
     var n = d.length / 4, sum = 0, sum2 = 0, i;
+    var cur = new Float32Array(n);
     for (i = 0; i < d.length; i += 4){
       var l = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-      sum += l; sum2 += l * l;
+      cur[i / 4] = l; sum += l; sum2 += l * l;
     }
     var mean = sum / n;
     var std = Math.sqrt(Math.max(0, sum2 / n - mean * mean));
-    return std > 4;
-  } catch(e){ return false; }
+    var moved = 0;
+    if (framePrev && framePrev.length === n){
+      var ch = 0, j;
+      for (j = 0; j < n; j++) if (Math.abs(cur[j] - framePrev[j]) > 2) ch++;
+      moved = ch / n;
+    }
+    framePrev = cur;
+    return { ready: true, std: std, moved: moved };
+  } catch(e){ return { ready: false }; }
 }
 function faceCheck(){
   if (!foc.camOn || !foc.faceAvail || !window.faceapi) return;
+  var v = $('cam');
+  // 0) Self-heal: video element ke-pause (autoplay kena kebijakan browser, tab dibuka
+  //    ulang, dll.) → preview item padahal track-nya hidup. Jangan langsung salahkan
+  //    kamera — cobain mainkan lagi dulu.
+  if (v.paused && v.srcObject){ var pp = v.play(); if (pp && pp.catch) pp.catch(function(){}); }
   // 1) Track-nya masih hidup nggak? Kamera ketutup/laptop ditutup bikin track mati atau mute,
   //    tapi <video> tetap nampilin frame terakhir — deteksi di frame beku itu yang bikin
   //    "kamera ditutup tapi dianggap fokus".
   var tr = foc.stream ? foc.stream.getVideoTracks()[0] : null;
+  if (tr && tr.readyState === 'ended'){ cameraDied(); return; }
   var trackOk = !!tr && tr.readyState === 'live' && !tr.muted;
-  // 2) Frame-nya beneran ada isinya (bukan item karena kamera ketutup fisik)?
-  var frameOk = trackOk ? frameHasSignal() : false;
+  // 2) Frame-nya beneran ada isinya (bukan item/beku karena kamera ketutup fisik)?
+  var fs = frameStatus();
+  var frameOk = trackOk && fs.ready && (fs.std > 2.5 || fs.moved > 0.01);
+  // 3) Debounce: satu cek jelek (frame gelap sesaat, exposure lagi naik, dll.) bukan
+  //    berarti mati — wajib gagal 2x berturut-turut (±8 detik) baru dinyatakan berhenti.
   if (!trackOk || !frameOk){
-    faceLost();
+    foc.deadStreak++;
+    if (foc.deadStreak >= 2) faceLost();
     return;
   }
+  foc.deadStreak = 0;
   var opts = new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 });
   Promise.resolve(window.faceapi.detectSingleFace($('cam'), opts)).then(function(res){
     var has = !!res;
@@ -1491,7 +1555,9 @@ function updateFocusUI(){
   $('st-focus').textContent = tot ? Math.round(session.focusTicks / tot * 100) + '%' : '\u2013';
   $('st-tab').textContent = session.tabInt;
   $('st-face').textContent = session.faceInt;
-  if (foc.camOn && foc.faceAvail){
+  if (foc.camLost && !foc.camOn){
+    setStatus($('face-status'), 'kamera mati/dicabut — klik "Nyalakan kamera".', 'err');
+  } else if (foc.camOn && foc.faceAvail){
     var trk = foc.stream ? foc.stream.getVideoTracks()[0] : null;
     var trkOk = !!trk && trk.readyState === 'live' && !trk.muted;
     if (!trkOk) setStatus($('face-status'), 'kamera berhenti/tertutup — dihitung nggak fokus.', 'err');

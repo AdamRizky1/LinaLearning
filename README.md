@@ -29,9 +29,18 @@ Satu file aja (index.html), nggak ada build step.
   cadangan). Semua SVG dibikin GLM 5.3 Flash di panggilan terpisah.
 - Focus counter: tiap 5 detik dihitung fokus kalau tab kebuka dan, kalau
   kamera nyala, wajah ke-deteksi. Pindah tab, wajah hilang, DAN kamera
-  ketutup/laptop ditutup semua dihitung gangguan. Cek anti-frame-beku: track
-  kamera yang mati/mute atau frame yang hampir rata warnanya (kamera tertutup
-  fisik) otomatis dianggap wajah ilang — nilai lama nggak nyangkut. Kalau model
+  ketutup/laptop ditutup semua dihitung gangguan. Cek anti-frame-beku dua
+  sinyal: variasi terang dalam frame (kamera tertutup fisik → ~0) DAN
+  perubahan antar frame (frame beku → ~0) — kamera hidup di ruangan gelap
+  pun lolos karena noise sensor-nya tetap "gerak". Vonis "kamera berhenti"
+  butuh 2 cek gagal berturut-turut (±8 detik), jadi frame gelap sesaat nggak
+  bikin salah lapor. Preview video di-play() eksplisit + autoplay ulang kalau
+  ke-pause (biar nggak keliru dilapor "kamera berhenti" padahal kamera nyala).
+  Track yang 'ended' (kamera dicabut/dimatiin OS) langsung bikin UI balik ke
+  kondisi mati beneran (tombol jadi "Nyalakan kamera", preview ilang) dan tick
+  berikutnya dihitung gangguan sampai kamera dinyalain lagi — nggak dapet nilai
+  fokus gratisan. Stream lama di-stop tiap nyalain/matiin + request yang masih
+  ngantre dibatalin, biar lampu LED kamera nggak nyala sendiri. Kalau model
   wajah gagal load, fokus dihitung dari tab aja sesuai janji pesan errornya.
 - Laporan sesi: durasi, skor fokus, gangguan, skor kuis. Bisa dikirim ke
   email orang tua, dibuka via Gmail, dikopi, atau diunduh jadi html.
