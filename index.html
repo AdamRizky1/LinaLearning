@@ -215,7 +215,7 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
     <span class="brand" aria-hidden="true">L</span>
     <h1>LinaLearning</h1>
     <div class="who" id="who"></div>
-    <button class="btn2" id="btn-settings" type="button">Pengaturan</button>
+    <button class="btn2" id="btn-logout" type="button">Ganti profil</button>
   </div>
 </div>
 <div class="wrap">
@@ -379,50 +379,14 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
   </div>
 </footer>
 
-<div class="overlay hide" id="ov-settings">
-  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="set-title">
-    <h3 id="set-title">Pengaturan API</h3>
-    <label for="cfg-base">Base URL (OpenAI-compatible)</label>
-    <input type="text" id="cfg-base">
-    <label for="cfg-key">API key</label>
-    <input type="password" id="cfg-key" autocomplete="off">
-    <label for="cfg-chat">Model modul &amp; slide (naskah)</label>
-    <input type="text" id="cfg-chat" list="chat-model-list">
-    <label for="cfg-quiz">Model kuis (soal pilihan ganda)</label>
-    <input type="text" id="cfg-quiz" list="chat-model-list">
-    <datalist id="chat-model-list">
-      <option value="glm-5-3-flash">GLM 5.3 Flash — konteks 1M, spesialis dokumen terstruktur (default modul &amp; slide)</option>
-      <option value="gpt-6-luna">GPT 6 Luna — cepat, spesialis tugas terstruktur berulang (default kuis)</option>
-      <option value="glm-5-2">GLM 5.2 — kualitas tulis lebih tinggi</option>
-      <option value="deepseek-v4-1-flash">DeepSeek V4.1 Flash — alternatif paling murah</option>
-    </datalist>
-    <label for="cfg-asr">Model ASR (suara ke teks)</label>
-    <input type="text" id="cfg-asr" list="asr-model-list">
-    <datalist id="asr-model-list">
-      <option value="whisper-large-v3-turbo">Whisper large-v3-turbo — akurat, default</option>
-      <option value="whisper-1">Whisper 1 — standar</option>
-      <option value="gpt-transcribe">GPT Transcribe</option>
-    </datalist>
-    <label for="cfg-proxy">Proxy buat chat (opsional)</label>
-    <input type="text" id="cfg-proxy" placeholder="https://proxy.example.com?url=">
-    <p class="note">Default memakai Kenari (kenari.id), gateway OpenAI-compatible dengan CORS
-      terbuka, jadi aman dipanggil langsung dari browser tanpa proxy. Kolom proxy cuma perlu diisi
-      kalau ganti ke provider lain yang keblokir browser (misal cors-anywhere yang kamu deploy
-      sendiri).</p>
-    <div class="row2">
-      <button class="btn" id="cfg-save" type="button">Simpan</button>
-      <button class="btn2" id="cfg-test" type="button">Tes koneksi</button>
-      <button class="btn2" id="cfg-logout" type="button">Ganti profil</button>
-      <button class="btn2" id="cfg-close" type="button">Tutup</button>
-    </div>
-    <p class="status" id="cfg-status" role="status"></p>
-  </div>
-</div>
-
 <script>
 'use strict';
+// Konfigurasi API tidak lagi bisa diubah dari UI: semuanya di-hardcode di sini
+// supaya siswa tidak perlu paham base URL / key / nama model.
+// Jobdesk 2 model (berdasar keunggulan benchmark):
+//   - glm-5-3-flash  → modul & slide: konteks 1M, kuat menyusun dokumen panjang terstruktur
+//   - gpt-6-luna     → kuis: cepat & konsisten untuk tugas terstruktur berulang (JSON soal)
 var DEFAULT_CONFIG = {
-  cfgVer: 3,
   base: 'https://kenari.id/v1',
   key: 'kn-28b4e80cdd6d01fcd04f18ebe4a589d3dc9cb04f48d65912',
   chatModel: 'glm-5-3-flash',
@@ -435,12 +399,10 @@ function loadJSON(k, fb){
   try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; }catch(e){ return fb; }
 }
 function saveJSON(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
-var storedCfg = loadJSON('lina_config', {});
-// Pengaturan lama (versi beda, mis. masih nunjuk ke api.z.ai) dibuang otomatis
-// supaya semua browser langsung pakai default yang baru tanpa hapus manual.
-var cfg = (storedCfg && storedCfg.cfgVer === DEFAULT_CONFIG.cfgVer)
-  ? Object.assign({}, DEFAULT_CONFIG, storedCfg)
-  : Object.assign({}, DEFAULT_CONFIG);
+// Config lama di localStorage (masa-masa ada panel Pengaturan) dibuang sekalian
+// supaya tidak ada config basi yang menimpa default baru.
+localStorage.removeItem('lina_config');
+var cfg = Object.assign({}, DEFAULT_CONFIG);
 var profile = loadJSON('lina_profile', null);
 var histList = loadJSON('lina_history', []);
 var session = null;
@@ -482,66 +444,24 @@ $('form-setup').addEventListener('submit', function(e){
   enterHome();
 });
 
-$('btn-settings').addEventListener('click', openSettings);
-$('cfg-close').addEventListener('click', function(){ $('ov-settings').classList.add('hide'); });
-function openSettings(){
-  $('cfg-base').value = cfg.base;
-  $('cfg-key').value = cfg.key;
-  $('cfg-chat').value = cfg.chatModel;
-  $('cfg-quiz').value = cfg.quizModel;
-  $('cfg-asr').value = cfg.asrModel;
-  $('cfg-proxy').value = cfg.chatProxy || '';
-  setStatus($('cfg-status'), '');
-  $('ov-settings').classList.remove('hide');
-}
-$('cfg-save').addEventListener('click', function(){
-  cfg.base = $('cfg-base').value.trim().replace(/\/+$/, '');
-  cfg.key = $('cfg-key').value.trim();
-  cfg.chatModel = $('cfg-chat').value.trim() || DEFAULT_CONFIG.chatModel;
-  cfg.quizModel = $('cfg-quiz').value.trim() || DEFAULT_CONFIG.quizModel;
-  cfg.asrModel = $('cfg-asr').value.trim() || DEFAULT_CONFIG.asrModel;
-  cfg.chatProxy = $('cfg-proxy').value.trim();
-  cfg.cfgVer = DEFAULT_CONFIG.cfgVer;
-  saveJSON('lina_config', cfg);
-  setStatus($('cfg-status'), 'Tersimpan.', 'ok');
-});
-$('cfg-logout').addEventListener('click', function(){
+$('btn-logout').addEventListener('click', function(){
   session = null;
   if (typeof foc !== 'undefined' && foc.loop) stopFocus();
   if (sessionTimeLoop){ clearTimeout(sessionTimeLoop); sessionTimeLoop = null; }
   localStorage.removeItem('lina_profile');
   profile = null;
-  $('ov-settings').classList.add('hide');
   show('screen-setup');
-});
-$('cfg-test').addEventListener('click', function(){
-  $('cfg-save').click();
-  var el = $('cfg-status');
-  var mDoc = cfg.chatModel, mQuiz = cfg.quizModel || cfg.chatModel;
-  setStatus(el, 'Ngetes koneksi 2 model\u2026', 'wait');
-  function ping(m){
-    return chatComplete([{ role:'user', content:'Balas satu kata saja: siap' }],
-      { maxTokens: 512, temperature: 0.1, model: m });
-  }
-  Promise.all([
-    ping(mDoc).then(function(){ return null; }, function(err){ return explainErr(err); }),
-    ping(mQuiz).then(function(){ return null; }, function(err){ return explainErr(err); })
-  ]).then(function(rs){
-    var bad = [];
-    if (rs[0]) bad.push('modul & slide (' + mDoc + '): ' + rs[0]);
-    if (rs[1]) bad.push('kuis (' + mQuiz + '): ' + rs[1]);
-    if (bad.length) setStatus(el, 'Gagal \u2192 ' + bad.join(' | '), 'err');
-    else setStatus(el, 'Koneksi oke, dua model siap (' + mDoc + ' + ' + mQuiz + ').', 'ok');
-  });
 });
 
 function explainErr(err){
   if (err && err.cors){
-    return 'Request keblokir browser (CORS). Endpoint chat di base URL ini nggak ngirim header '
-      + 'preflight. Isi kolom proxy di pengaturan, atau pakai provider yang support browser.';
+    return 'Request keblokir browser (CORS). Coba muat ulang halaman, kalau masih gitu '
+      + 'kabari pemilik situsnya.';
   }
-  if (err && err.code === 401) return 'API key ditolak (401, token expired or incorrect). Cek lagi key-nya di pengaturan.';
-  if (err && err.code === 404) return 'Model atau endpoint nggak ketemu (404). Cek nama model sama base URL.';
+  if (err && err.code === 401) return 'API key ditolak (401, token expired or incorrect). '
+    + 'Key-nya bawaan aplikasi, coba muat ulang halaman atau kabari pemilik situsnya.';
+  if (err && err.code === 404) return 'Model atau endpoint API nggak ketemu (404). '
+    + 'Kabari pemilik situsnya, konfigurasi API-nya perlu dibenahi.';
   if (err && err.code === 429) return 'Kena limit (429). Tunggu sebentar, coba lagi.';
   return (err && err.message) ? err.message : 'Gagal manggil API.';
 }
@@ -850,7 +770,7 @@ $('btn-gen').addEventListener('click', function(){
   ).then(function(raw){
     var d = parseLesson(raw);
     if (!d || !Array.isArray(d.modul) || !d.modul.length || !Array.isArray(d.slide) || !d.slide.length){
-      throw new Error('JSON modul/slide nggak lengkap. Coba lagi, kalau masih gitu ganti model di pengaturan.');
+      throw new Error('JSON modul/slide nggak lengkap. Coba lagi, kalau masih gitu muat ulang halamannya.');
     }
     return d;
   }).catch(tag('Modul & slide', mDoc));
@@ -860,7 +780,7 @@ $('btn-gen').addEventListener('click', function(){
   ).then(function(raw){
     var d = parseLesson(raw);
     if (!d || !Array.isArray(d.kuis) || !d.kuis.length){
-      throw new Error('JSON kuis nggak lengkap. Coba lagi, kalau masih gitu ganti model di pengaturan.');
+      throw new Error('JSON kuis nggak lengkap. Coba lagi, kalau masih gitu muat ulang halamannya.');
     }
     return d;
   }).catch(tag('Kuis', mQuiz));

@@ -34,7 +34,8 @@ lalu buka http://localhost:8000. Mau online? Upload index.html ke mana aja
 
 Pakai Kenari (kenari.id), gateway LLM Indonesia yang OpenAI-compatible dan
 CORS-nya terbuka, jadi semua request aman langsung dari browser tanpa proxy.
-Semua bisa diubah di menu Pengaturan:
+Konfigurasi di-hardcode langsung di index.html (tidak ada panel pengaturan
+lagi), jadi siswa tinggal pakai:
 
 - Base URL: https://kenari.id/v1
 - Key: format kn-... dari https://kenari.id/keys (tagihan Rupiah)
@@ -44,18 +45,15 @@ Semua bisa diubah di menu Pengaturan:
 - Model kuis: gpt-6-luna. Dipilih karena posisi benchmark-nya sebagai model
   cepat untuk tugas terstruktur berulang (JSON, ekstraksi, klasifikasi) dengan
   latensi rendah
-- Dua model itu jalan paralel pas menekan "Buat modul". Ganti kapan pun di
-  Pengaturan (kolom Model modul & slide / Model kuis); tombol "Tes koneksi"
-  mengetes dua-duanya sekaligus
+- Dua model itu jalan paralel pas menekan "Buat modul"
 - Model ASR: whisper-large-v3-turbo
 
 Dua hal yang perlu diketahui:
 
 1. Kalau ganti ke provider lain yang nggak ngirim header preflight CORS
    (misal chat completions di api.z.ai), request generate modul bisa
-   keblokir browser. Solusinya isi kolom proxy di Pengaturan (misal
-   cors-anywhere yang kamu deploy sendiri) atau pakai provider yang
-   support browser.
+   keblokir browser. Konfigurasi ada di objek DEFAULT_CONFIG di index.html
+   (kolom chatProxy), atau pakai provider yang support browser.
 2. Key yang nempel default di file ini punya pemilik repo, buat ngobrol
    langsung tanpa setup. Taruh key asli di repo publik itu resiko sendiri;
    rotate kalau keceplosan.
@@ -72,4 +70,5 @@ langsung nyiapin draft laporan ke email orang tua.
 - Deteksi wajah pakai face-api.js (tiny face detector), dimuat dari CDN
   pas kamera dinyalakan. Kalau CDN-nya gagal, fokus dihitung dari tab aja.
 - PDF dibaca pakai pdf.js dari CDN.
-- Profil, pengaturan API, dan riwayat sesi disimpan di localStorage browser.
+- Profil dan riwayat sesi disimpan di localStorage browser; config API lama
+  otomatis dihapus sekali pas halaman dibuka (masa-masa ada panel pengaturan).
