@@ -126,12 +126,19 @@ video#cam{width:168px;height:126px;background:#1c1826;border-radius:var(--r-sm);
 .modul ul{margin:8px 0;padding-left:22px}
 .modul li{margin:5px 0}
 .modul hr.rule{margin:22px 0 0}
+.fig{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:var(--r);
+  padding:10px;margin:12px 0}
+.fig svg{width:100%;height:auto;max-height:300px;display:block}
+.analogi{background:var(--warn-bg);border-left:4px solid var(--clay);border-radius:var(--r-sm);
+  padding:10px 14px;margin:11px 0;font-size:15.5px;line-height:1.6}
 
 .slidebox{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
   padding:36px 40px;min-height:340px;display:flex;flex-direction:column;box-shadow:var(--shadow);
   position:relative;overflow:hidden}
 .slidebox::before{content:"";position:absolute;left:0;top:0;height:4px;width:100%;background:var(--accent)}
 .slidebox h2{font-size:27px}
+.slidebox .fig{margin:10px 0 0}
+.slidebox .fig svg{max-height:210px}
 .slidebox ul{padding-left:24px;font-size:18px;line-height:1.7;margin:8px 0}
 .slidebox .note{margin-top:auto;padding-top:18px}
 .slidenav{display:flex;gap:10px;align-items:center;margin-top:14px}
@@ -293,7 +300,8 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
   <div class="section">
     <h2><span class="stepno">4</span>Susun modul, slide &amp; kuis</h2>
     <p class="note">Tombol di bawah aktif kalau transkrip (langkah 3) atau materi (langkah 2) udah ada
-      — salah satu aja cukup. Kalau dua-duanya ada, hasilnya makin pas.</p>
+      — salah satu aja cukup. Prosesnya: referensi web dicari dulu, terus materinya disusun pakai
+      analogi yang gampang dipahami, terus digambar ilustrasinya. Butuh 2–4 menit.</p>
     <button class="btn" id="btn-gen" type="button" disabled>Buat modul, slide &amp; kuis</button>
     <p class="status" id="gen-status" role="status"></p>
   </div>
@@ -752,61 +760,80 @@ $('btn-gen').addEventListener('click', function(){
   var btn = this;
   btn.disabled = true;
   var mDoc = cfg.chatModel, mQuiz = cfg.quizModel || cfg.chatModel;
-  setStatus(st, 'Nyusun modul & slide [' + mDoc + '] paralel dengan kuis [' + mQuiz
-    + ']. Butuh 1\u20132 menit, jangan ditutup halamannya.', 'wait');
-  var sysDoc = 'Kamu guru di Indonesia yang merangkum pelajaran jadi bahan belajar siswa. '
-    + 'Balas HANYA JSON valid tanpa penjelasan lain, tanpa markdown, dengan bentuk: '
-    + '{"judul":string,"ringkasan":string,"modul":[{"judul":string,"isi":string,"poin":[string]}],'
-    + '"slide":[{"judul":string,"isi":[string],"catatan":string}]} '
-    + 'Kolom "isi" boleh beberapa paragraf, pisahkan dengan dua newline. '
-    + 'Buat 4-6 bagian modul dan 8-12 slide. '
-    + 'Pakai bahasa Indonesia yang jelas dan enak dibaca siswa. '
-    + (!trans
-      ? 'Sumbernya cuma materi tulisan di bawah; anggap itu materi pelajaran utamanya.'
-      : (materi ? 'Kalau ada materi tambahan, gabungkan isinya dan patuhi materi tersebut.' : ''));
-  var sysQuiz = 'Kamu guru di Indonesia yang bikin kuis pilihan ganda dari materi pelajaran. '
-    + 'Balas HANYA JSON valid tanpa penjelasan lain, tanpa markdown, dengan bentuk: '
-    + '{"kuis":[{"tanya":string,"pilihan":[string,string,string,string],"jawaban":0,"jelas":string}]} '
-    + '"jawaban" adalah index pilihan yang benar (0-3). Buat 8 soal yang menyebar merata ke poin-poin '
-    + 'penting materi, pengecohnya masuk akal. Pakai bahasa Indonesia yang jelas. '
-    + (!trans
-      ? 'Sumbernya cuma materi tulisan di bawah; anggap itu materi pelajaran utamanya.'
-      : (materi ? 'Kalau ada materi tambahan, patuhi materi tersebut.' : ''));
-  var usr = trans
-    ? ('TRANSKRIP:\n' + trans + (materi ? '\n\nMATERI TAMBAHAN:\n' + materi : ''))
-    : ('MATERI:\n' + materi);
-  function tag(what, model){
-    return function(err){
-      err.message = what + ' [' + model + ']: ' + ((err && err.message) || 'gagal');
-      throw err;
-    };
-  }
-  var pDoc = chatComplete(
-    [{ role: 'system', content: sysDoc }, { role: 'user', content: usr }],
-    { temperature: 0.4, maxTokens: 8192, model: mDoc }
-  ).then(function(raw){
-    var d = parseLesson(raw);
-    if (!d || !Array.isArray(d.modul) || !d.modul.length || !Array.isArray(d.slide) || !d.slide.length){
-      throw new Error('JSON modul/slide nggak lengkap. Coba lagi, kalau masih gitu muat ulang halamannya.');
+  // Fase 1: kumpulin referensi dari web dulu biar materinya akurat.
+  setStatus(st, 'Nyari referensi di web dulu buat mastikan materinya akurat\u2026', 'wait');
+  cariWeb(trans, materi).then(function(refs){
+    var refBlock = refs.length
+      ? ('\n\nREFERENSI WEB (buat cek fakta dan nambahin yang kurang; jangan nyebut sumbernya di hasil):\n'
+        + refs.map(function(r){ return '- ' + r.judul + ': ' + r.isi; }).join('\n'))
+      : '';
+    // Fase 2: nyusun modul & slide (GLM) paralel dengan kuis (GPT Luna).
+    setStatus(st, (refs.length ? 'Nemu ' + refs.length + ' referensi web. ' : '')
+      + 'Nyusun modul & slide [' + mDoc + '] paralel dengan kuis [' + mQuiz
+      + ']. Butuh 1\u20132 menit, jangan ditutup halamannya.', 'wait');
+    var sysDoc = 'Kamu guru di Indonesia yang merangkum pelajaran jadi bahan belajar siswa. '
+      + 'Balas HANYA JSON valid tanpa penjelasan lain, tanpa markdown, dengan bentuk: '
+      + '{"judul":string,"ringkasan":string,"modul":[{"judul":string,"isi":string,"analogi":string,"poin":[string]}],'
+      + '"slide":[{"judul":string,"isi":[string],"catatan":string}]} '
+      + 'Kolom "isi" boleh beberapa paragraf, pisahkan dengan dua newline. '
+      + 'Buat 4-6 bagian modul dan 8-12 slide. '
+      + 'Pakai bahasa Indonesia yang jelas dan enak dibaca siswa. '
+      + 'Kolom "analogi" isi 1-3 kalimat analogi atau perbandingan dari kehidupan sehari-hari yang '
+      + 'paling kamu yakin bikin konsep bagian itu gampang dipahami; pilih sendiri cara jelasin yang '
+      + 'paling cocok per konsep (analogi, cerita pendek, perbandingan sederhana). '
+      + (!trans
+        ? 'Sumbernya cuma materi tulisan di bawah; anggap itu materi pelajaran utamanya.'
+        : (materi ? 'Kalau ada materi tambahan, gabungkan isinya dan patuhi materi tersebut.' : ''));
+    var sysQuiz = 'Kamu guru di Indonesia yang bikin kuis pilihan ganda dari materi pelajaran. '
+      + 'Balas HANYA JSON valid tanpa penjelasan lain, tanpa markdown, dengan bentuk: '
+      + '{"kuis":[{"tanya":string,"pilihan":[string,string,string,string],"jawaban":0,"jelas":string}]} '
+      + '"jawaban" adalah index pilihan yang benar (0-3). Buat 8 soal yang menyebar merata ke poin-poin '
+      + 'penting materi, pengecohnya masuk akal. Pakai bahasa Indonesia yang jelas. '
+      + (!trans
+        ? 'Sumbernya cuma materi tulisan di bawah; anggap itu materi pelajaran utamanya.'
+        : (materi ? 'Kalau ada materi tambahan, patuhi materi tersebut.' : ''));
+    var usr = trans
+      ? ('TRANSKRIP:\n' + trans + (materi ? '\n\nMATERI TAMBAHAN:\n' + materi : ''))
+      : ('MATERI:\n' + materi);
+    usr += refBlock;
+    function tag(what, model){
+      return function(err){
+        err.message = what + ' [' + model + ']: ' + ((err && err.message) || 'gagal');
+        throw err;
+      };
     }
-    return d;
-  }).catch(tag('Modul & slide', mDoc));
-  var pQuiz = chatComplete(
-    [{ role: 'system', content: sysQuiz }, { role: 'user', content: usr }],
-    { temperature: 0.4, maxTokens: 8192, model: mQuiz }
-  ).then(function(raw){
-    var d = parseLesson(raw);
-    if (!d || !Array.isArray(d.kuis) || !d.kuis.length){
-      throw new Error('JSON kuis nggak lengkap. Coba lagi, kalau masih gitu muat ulang halamannya.');
-    }
-    return d;
-  }).catch(tag('Kuis', mQuiz));
-  Promise.all([pDoc, pQuiz]).then(function(rs){
-    var data = {
-      judul: rs[0].judul, ringkasan: rs[0].ringkasan,
-      modul: rs[0].modul, slide: rs[0].slide, kuis: rs[1].kuis
-    };
-    startSession(data, trans);
+    var pDoc = chatComplete(
+      [{ role: 'system', content: sysDoc }, { role: 'user', content: usr }],
+      { temperature: 0.4, maxTokens: 8192, model: mDoc }
+    ).then(function(raw){
+      var d = parseLesson(raw);
+      if (!d || !Array.isArray(d.modul) || !d.modul.length || !Array.isArray(d.slide) || !d.slide.length){
+        throw new Error('JSON modul/slide nggak lengkap. Coba lagi, kalau masih gitu muat ulang halamannya.');
+      }
+      return d;
+    }).catch(tag('Modul & slide', mDoc));
+    var pQuiz = chatComplete(
+      [{ role: 'system', content: sysQuiz }, { role: 'user', content: usr }],
+      { temperature: 0.4, maxTokens: 8192, model: mQuiz }
+    ).then(function(raw){
+      var d = parseLesson(raw);
+      if (!d || !Array.isArray(d.kuis) || !d.kuis.length){
+        throw new Error('JSON kuis nggak lengkap. Coba lagi, kalau masih gitu muat ulang halamannya.');
+      }
+      return d;
+    }).catch(tag('Kuis', mQuiz));
+    return Promise.all([pDoc, pQuiz]).then(function(rs){
+      var data = {
+        judul: rs[0].judul, ringkasan: rs[0].ringkasan,
+        modul: rs[0].modul, slide: rs[0].slide, kuis: rs[1].kuis
+      };
+      // Fase 3: gambar ilustrasi SVG (hero + per bagian + per slide).
+      setStatus(st, 'Susunan kelar. Sekarang nggambar ilustrasinya\u2026', 'wait');
+      return buatIlustrasi(data).then(function(ill){
+        data.ilustrasi = ill;
+        startSession(data, trans);
+      });
+    });
   }).catch(function(err){
     setStatus(st, explainErr(err), 'err');
     btn.disabled = false;
@@ -818,6 +845,138 @@ function parseLesson(raw){
   var a = s.indexOf('{'), b = s.lastIndexOf('}');
   if (a < 0 || b <= a) return null;
   try { return JSON.parse(s.slice(a, b + 1)); } catch(e){ return null; }
+}
+
+// ===== Referensi web (Wikipedia Indonesia, API-nya CORS terbuka) =====
+function fetchTimeout(url, ms){
+  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var t = ctrl ? setTimeout(function(){ ctrl.abort(); }, ms || 8000) : null;
+  return fetch(url, ctrl ? { signal: ctrl.signal } : undefined).then(function(r){
+    if (t) clearTimeout(t);
+    return r;
+  }, function(e){
+    if (t) clearTimeout(t);
+    throw e;
+  });
+}
+
+function cariWeb(trans, materi){
+  // Pilih kata kunci pakai model yang cepat, terus ambil ringkasan dari Wikipedia.
+  var src = (trans ? trans.slice(0, 1000) : '') + (materi ? '\n' + materi.slice(0, 600) : '');
+  return chatComplete([
+    { role: 'system', content: 'Kamu pemilih kata kunci pencarian. Balas HANYA JSON array berisi '
+      + '2-4 string kata kunci topik pelajaran berikut dalam bahasa Indonesia, tanpa penjelasan. '
+      + 'Contoh bentuk: ["siklus air","evaporasi"]' },
+    { role: 'user', content: src }
+  ], { maxTokens: 512, temperature: 0.2, model: cfg.quizModel || cfg.chatModel })
+  .then(function(raw){
+    var kw = [];
+    try { kw = JSON.parse(String(raw).replace(/```(json)?/g, '').trim()); } catch(e){ kw = []; }
+    if (!Array.isArray(kw)) kw = [];
+    kw = kw.filter(function(k){ return typeof k === 'string' && k.trim().length > 1; }).slice(0, 3);
+    if (!kw.length) return [];
+    return Promise.all(kw.map(wikiCari)).then(function(rs){
+      var out = [];
+      rs.forEach(function(r){ r.forEach(function(x){ if (x) out.push(x); }); });
+      return out.slice(0, 5);
+    });
+  })
+  .catch(function(){ return []; }); // gagal nyari web? lanjut aja tanpa referensi
+}
+
+function wikiCari(kw){
+  var url = 'https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch='
+    + encodeURIComponent(kw) + '&srlimit=2&format=json&origin=*';
+  return fetchTimeout(url, 8000)
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var hits = ((j && j.query && j.query.search) || []).slice(0, 2);
+      return Promise.all(hits.map(function(h){ return wikiAmbil(h.title); }));
+    })
+    .catch(function(){ return []; });
+}
+
+function wikiAmbil(title){
+  var url = 'https://id.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1'
+    + '&redirects=1&format=json&origin=*&titles=' + encodeURIComponent(title);
+  return fetchTimeout(url, 8000)
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var pages = (j && j.query && j.query.pages) || {};
+      var keys = Object.keys(pages);
+      if (!keys.length) return null;
+      var txt = String(pages[keys[0]].extract || '').trim();
+      if (!txt) return null;
+      return { judul: pages[keys[0]].title || title, isi: txt.slice(0, 550) };
+    })
+    .catch(function(){ return null; });
+}
+
+// ===== Ilustrator: diagram SVG buat hero, tiap bagian modul, dan slide =====
+function buatIlustrasi(data){
+  var outline = {
+    judul: data.judul || '',
+    modul: (data.modul || []).map(function(m, i){
+      return { i: i, judul: m.judul || '', isi: String(m.isi || '').slice(0, 240) };
+    }),
+    slide: (data.slide || []).map(function(s, i){
+      return { i: i, judul: s.judul || '', isi: (s.isi || []).join(' ').slice(0, 150) };
+    })
+  };
+  var sys = 'Kamu ilustrator edukasi yang bikin diagram SVG sederhana. Balas HANYA JSON valid tanpa '
+    + 'penjelasan lain, tanpa markdown, bentuknya: {"hero":string,"modul":[string],"slide":[string]} '
+    + '"hero" satu SVG peta konsep keseluruhan materi. "modul" array SVG yang panjangnya HARUS sama '
+    + 'dengan jumlah bagian modul di bawah, urut sesuai index. "slide" array SVG panjangnya sama '
+    + 'dengan jumlah slide urut index; kalau slide nggak butuh diagram, isi string kosong "". '
+    + 'Aturan tiap SVG: mulai <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 280">, ringkas '
+    + '(maksimal sekitar 25 elemen), tanpa tag script, tanpa atribut event (onclick dll), tanpa '
+    + 'foreignObject, tanpa resource eksternal, teks pendek font-family sans-serif minimal ukuran 12. '
+    + 'Palet: latar #ffffff atau #f6f3fa, bentuk utama #5c4694, aksen #9c7a2e, garis #d9d2e0, teks '
+    + '#221d2c. Pilih jenis diagram yang paling ngebantu paham isi bagian itu: alur, siklus, '
+    + 'perbandingan, hierarki, atau peta konsep.';
+  return chatComplete(
+    [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(outline) }],
+    { temperature: 0.3, maxTokens: 16384, model: cfg.chatModel }
+  ).then(function(raw){
+    var d = parseLesson(raw);
+    if (!d) throw new Error('ilustrasi nggak ke-parse');
+    var ill = { hero: safeSvg(d.hero), modul: {}, slide: {} };
+    (Array.isArray(d.modul) ? d.modul : []).forEach(function(s, i){
+      var v = safeSvg(s); if (v) ill.modul[i] = v;
+    });
+    (Array.isArray(d.slide) ? d.slide : []).forEach(function(s, i){
+      var v = safeSvg(s); if (v) ill.slide[i] = v;
+    });
+    return ill;
+  }).catch(function(){
+    // Ilustrasi gagal? Sesi tetap jalan, tinggal pakai visual cadangan.
+    return { hero: '', modul: {}, slide: {} };
+  });
+}
+
+function safeSvg(s){
+  if (!s || typeof s !== 'string') return '';
+  s = s.trim();
+  if (!/^<svg[\s>]/i.test(s)) return '';
+  s = s.replace(/<script[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<script[^>]*\/?>/gi, '')
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(xlink:href|href)\s*=\s*("|')\s*(javascript|data)[^"']*\2/gi, '');
+  return /<\/svg>/i.test(s) ? s : s + '</svg>';
+}
+
+function defaultSlideSvg(idx){
+  var cols = ['#5c4694', '#9c7a2e', '#443473', '#4a7c59'];
+  var c = cols[idx % cols.length];
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 160" role="img" aria-hidden="true">'
+    + '<rect width="480" height="160" rx="12" fill="#f6f3fa"/>'
+    + '<circle cx="70" cy="80" r="34" fill="' + c + '" opacity="0.9"/>'
+    + '<rect x="130" y="46" width="150" height="12" rx="6" fill="' + c + '" opacity="0.35"/>'
+    + '<rect x="130" y="74" width="210" height="12" rx="6" fill="' + c + '" opacity="0.55"/>'
+    + '<rect x="130" y="102" width="120" height="12" rx="6" fill="' + c + '" opacity="0.35"/>'
+    + '<circle cx="418" cy="80" r="26" fill="none" stroke="' + c + '" stroke-width="5"/>'
+    + '</svg>';
 }
 
 function startSession(data, trans){
@@ -855,15 +1014,19 @@ function tickTime(){
 }
 
 function renderModule(data){
+  var ill = data.ilustrasi || {};
   var h = '';
+  if (ill.hero) h += '<div class="fig">' + ill.hero + '</div>';
   if (data.ringkasan) h += '<p class="note">' + esc(data.ringkasan) + '</p>';
   (data.modul || []).forEach(function(m, i){
     h += (i ? '<hr class="rule">' : '')
       + '<h2 style="margin-top:' + (i ? '22px' : '10px') + '">'
       + esc(m.judul || ('Bagian ' + (i + 1))) + '</h2>';
+    if (ill.modul && ill.modul[i]) h += '<div class="fig">' + ill.modul[i] + '</div>';
     String(m.isi || '').split(/\n{2,}/).forEach(function(par){
       if (par.trim()) h += '<p>' + esc(par.trim()) + '</p>';
     });
+    if (m.analogi) h += '<div class="analogi"><b>Cara gampang nangkepnya:</b> ' + esc(m.analogi) + '</div>';
     if (m.poin && m.poin.length){
       h += '<p style="margin-bottom:4px"><b>Poin penting:</b></p><ul>';
       m.poin.forEach(function(p){ h += '<li>' + esc(p) + '</li>'; });
@@ -889,7 +1052,10 @@ function drawSlide(){
     $('sl-next').disabled = true;
     return;
   }
-  var h = '<h2>' + esc(s.judul || '') + '</h2><ul>';
+  var ill = (session && session.data && session.data.ilustrasi) || {};
+  var svg = (ill.slide && ill.slide[slideIdx]) || defaultSlideSvg(slideIdx);
+  var h = '<h2>' + esc(s.judul || '') + '</h2>'
+    + '<div class="fig">' + svg + '</div><ul>';
   (s.isi || []).forEach(function(b){ h += '<li>' + esc(b) + '</li>'; });
   h += '</ul>';
   if (s.catatan) h += '<p class="note">' + esc(s.catatan) + '</p>';

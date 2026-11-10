@@ -17,6 +17,16 @@ Satu file aja (index.html), nggak ada build step.
   sumber aja udah cukup: bisa dari transkrip saja (tanpa materi), atau dari
   materi tulisan saja (tanpa rekaman audio sama sekali). Kalau dua-duanya ada,
   digabung: transkrip jadi sumber utama, materi dipatuhi.
+- Alur nyusun 3 fase: (1) referensi dicari dulu di web — Wikipedia Indonesia
+  yang API-nya CORS terbuka, kata kuncinya dipilih model — buat mastikan fakta,
+  (2) modul & slide (GLM 5.3 Flash) paralel dengan kuis (GPT 6 Luna), dan
+  (3) diagram SVG digambar. Gagal nyari web atau gambar? Sesi tetap jalan.
+- Tiap bagian modul ada kolom "analogi": model memilih sendiri cara jelasin
+  yang paling gampang dipahami (analogi kehidupan sehari-hari, cerita pendek,
+  atau perbandingan sederhana), ditonjolkan dalam kotak khusus.
+- Visual: satu diagram hero (peta konsep) di tab modul, diagram per bagian
+  modul, dan visual di tiap slide (yang nggak butuh diagram pakai banner
+  cadangan). Semua SVG dibikin GLM 5.3 Flash di panggilan terpisah.
 - Focus counter: tiap 5 detik dihitung fokus kalau tab kebuka dan, kalau
   kamera nyala, wajah ke-deteksi. Pindah tab dan wajah hilang dihitung
   gangguan.
@@ -73,5 +83,7 @@ langsung nyiapin draft laporan ke email orang tua.
 - Deteksi wajah pakai face-api.js (tiny face detector), dimuat dari CDN
   pas kamera dinyalakan. Kalau CDN-nya gagal, fokus dihitung dari tab aja.
 - PDF dibaca pakai pdf.js dari CDN.
+- SVG ilustrasi hasil model disaring dulu (tag script, atribut event, dan URL
+  javascript:/data: dibuang) sebelum dirender ke halaman.
 - Profil dan riwayat sesi disimpan di localStorage browser; config API lama
   otomatis dihapus sekali pas halaman dibuka (masa-masa ada panel pengaturan).
