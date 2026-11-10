@@ -281,10 +281,11 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
     <h2><span class="stepno">2</span>Materi tambahan <span class="note">(opsional)</span></h2>
     <p class="note">Nggak wajib. Kalau ada rangkuman, file bab, atau PDF yang nyambung, nanti digabung
       sama transkrip waktu modul disusun. Mau tanpa rekaman juga bisa: isi materinya di sini aja,
-      terus langsung tekan tombol di langkah 4.</p>
+      terus langsung tekan tombol di langkah 4. File bisa .txt, .md, .pdf, .docx (Word), atau .rtf —
+      PDF hasil scan/foto juga otomatis dicoba dibaca pakai OCR.</p>
     <textarea id="in-materi" placeholder="Tempel materi di sini, kalau ada."></textarea>
     <div style="margin-top:8px">
-      <input type="file" id="in-doc" accept=".txt,.md,.pdf" aria-label="File materi tambahan">
+      <input type="file" id="in-doc" accept=".txt,.md,.pdf,.docx,.rtf" aria-label="File materi tambahan">
       <p class="note" id="doc-info" style="margin-top:6px"></p>
     </div>
   </div>
@@ -336,7 +337,8 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
     </div>
   </div>
   <p class="note" style="margin-top:8px">Skor fokus dihitung tiap 5 detik: dihitung fokus kalau tab-nya
-    kebuka, dan kalau kamera nyala, wajahnya juga ke-cekung. Pindah tab atau wajah ilang dihitung gangguan.</p>
+    kebuka, dan kalau kamera nyala, wajahnya juga ke-cekung. Pindah tab, wajah ilang, atau kamera
+    ketutup/laptop ditutup semua dihitung gangguan — jadi jangan harap nutup kamera terus tetep dapet skor.</p>
 
   <div class="tabs" role="tablist" aria-label="Bahan belajar">
     <button role="tab" id="tab-modul" aria-selected="true" type="button">Modul</button>
@@ -685,17 +687,46 @@ function wavBlob(f32){
 $('in-doc').addEventListener('change', function(){
   var f = this.files[0];
   if (!f) return;
+  if (f.size > 25 * 1024 * 1024){
+    $('doc-info').textContent = 'File-nya kebesaran (maks 25 MB). Pecah dulu atau tempel teksnya manual.';
+    this.value = '';
+    return;
+  }
   if (/\.pdf$/i.test(f.name)){ extractPdf(f); return; }
+  if (/\.docx$/i.test(f.name)){ extractDocx(f); return; }
+  if (/\.rtf$/i.test(f.name)){ extractRtf(f); return; }
   f.text().then(function(t){
-    appendMateri(t);
-    $('doc-info').textContent = f.name + ' dimuat (' + t.length + ' karakter).';
+    if (looksBinary(t)){
+      $('doc-info').textContent = 'Format "' + f.name + '" nggak bisa dibaca browser (misal .doc lama, '
+        + '.pptx, atau .pages). Simpan ulang sebagai .docx/.pdf, atau tempel teksnya manual.';
+      return;
+    }
+    if (!appendMateri(t)){
+      $('doc-info').textContent = 'File ' + f.name + ' kosong isinya.';
+      return;
+    }
+    $('doc-info').textContent = f.name + ' dimuat (' + t.length + ' karakter). Digabung ke kolom materi.';
+  }).catch(function(){
+    $('doc-info').textContent = 'Gagal baca file-nya. Tempel teksnya manual aja di kolom materi.';
   });
 });
 function appendMateri(t){
-  if (!t.trim()) return;
+  if (!t || !t.trim()) return false;
   var cur = $('in-materi').value;
   $('in-materi').value = cur ? cur + '\n\n' + t.trim() : t.trim();
   updateGenReady();
+  return true;
+}
+// Nyamber file biner yang kebaca jadi karakter aneh (misal .doc/.pptx diubah jadi .txt)
+function looksBinary(t){
+  if (!t) return true;
+  var head = t.slice(0, 1000), ctl = 0, i;
+  for (i = 0; i < head.length; i++){
+    var c = head.charCodeAt(i);
+    if (c === 0) return true;
+    if (c < 9 || (c > 13 && c < 32)) ctl++;
+  }
+  return ctl / head.length > 0.05;
 }
 // Tombol generate aktif kalau salah satu sumber udah ada: transkrip ATAU materi.
 function updateGenReady(){
@@ -704,6 +735,7 @@ function updateGenReady(){
 }
 $('in-trans').addEventListener('input', updateGenReady);
 $('in-materi').addEventListener('input', updateGenReady);
+var OCR_MAX_PAGES = 6;
 function extractPdf(f){
   $('doc-info').textContent = 'Membaca PDF\u2026';
   loadScript('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js').then(function(){
@@ -716,11 +748,28 @@ function extractPdf(f){
       var p = 1;
       function nxt(){
         if (p > doc.numPages){
-          var t = pages.join('\n\n');
-          appendMateri(t);
-          $('doc-info').textContent = f.name + ': ' + doc.numPages + ' halaman, '
-            + t.length + ' karakter. Digabung ke kolom materi.';
-          return;
+          var t = pages.join('\n\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+          if (t.length >= 200){
+            if (appendMateri(t)){
+              $('doc-info').textContent = f.name + ': ' + doc.numPages + ' halaman, '
+                + t.length + ' karakter. Digabung ke kolom materi.';
+            } else {
+              $('doc-info').textContent = 'PDF-nya kosong isinya.';
+            }
+            return;
+          }
+          // Teks nyaris kosong = PDF-nya kemungkinan besar hasil scan (cuma gambar). Coba OCR.
+          $('doc-info').textContent = 'Teks PDF-nya nggak kebaca (kayaknya hasil scan). Dicoba pakai OCR\u2026';
+          return ocrPdf(doc).then(function(t2){
+            if (t2 && t2.length > t.length && appendMateri(t2)){
+              $('doc-info').textContent = f.name + ': ' + doc.numPages + ' halaman, kebaca pakai OCR ('
+                + t2.length + ' karakter, maks ' + OCR_MAX_PAGES + ' halaman pertama). '
+                + 'Udah digabung ke kolom materi, cek lagi deh hasilnya.';
+            } else {
+              $('doc-info').textContent = 'PDF-nya hasil scan tapi OCR-nya gagal/nemu dikit. '
+                + 'Tempel teksnya manual di kolom materi, atau jepret bagian pentingnya buat direkam.';
+            }
+          });
         }
         $('doc-info').textContent = 'Membaca PDF halaman ' + p + '/' + doc.numPages + '\u2026';
         return doc.getPage(p++).then(function(pg){
@@ -734,6 +783,126 @@ function extractPdf(f){
     });
   }).catch(function(){
     $('doc-info').textContent = 'Gagal baca PDF (loader butuh internet). Tempel teksnya manual aja.';
+  });
+}
+// OCR buat PDF scan: render tiap halaman ke canvas terus dibaca tesseract.js (indo+inggris).
+function ocrPdf(doc){
+  return loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js')
+    .then(function(){
+      var T = window.Tesseract;
+      if (!T || !T.createWorker) return '';
+      return T.createWorker('ind+eng', 1, {
+        logger: function(m){
+          if (m && m.status === 'recognizing text' && m.progress != null)
+            $('doc-info').textContent = 'OCR jalan\u2026 ' + Math.round(m.progress * 100) + '% (butuh internet, sabar ya)';
+        }
+      }).then(function(worker){
+        var out = [], p = 1, maxP = Math.min(doc.numPages, OCR_MAX_PAGES);
+        function nxt(){
+          if (p > maxP){
+            return worker.terminate().then(function(){
+              return out.join('\n\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+            });
+          }
+          $('doc-info').textContent = 'OCR halaman ' + p + '/' + maxP + '\u2026';
+          return doc.getPage(p++).then(function(pg){
+            var vp = pg.getViewport({ scale: 2 });
+            var cv = document.createElement('canvas');
+            cv.width = vp.width; cv.height = vp.height;
+            return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise
+              .then(function(){ return worker.recognize(cv); })
+              .then(function(r){ out.push(((r && r.data && r.data.text) || '').trim()); return nxt(); });
+          });
+        }
+        return nxt();
+      });
+    }).catch(function(){ return ''; });
+}
+// .docx = ZIP berisi XML. Browser modern punya DecompressionStream, jadi kita bongkar sendiri
+// tanpa library tambahan: cari word/document.xml di tabel ZIP, inflate, terus bersihin XML-nya.
+function extractDocx(f){
+  $('doc-info').textContent = 'Membaca file Word\u2026';
+  f.arrayBuffer().then(function(buf){
+    return zipReadFile(buf, 'word/document.xml');
+  }).then(function(xml){
+    if (!xml) throw new Error('document.xml nggak ketemu');
+    var t = xmlToText(xml);
+    if (!appendMateri(t)){
+      $('doc-info').textContent = 'File Word-nya kosong isinya.';
+      return;
+    }
+    $('doc-info').textContent = f.name + ' dimuat (' + t.length + ' karakter). Digabung ke kolom materi.';
+  }).catch(function(){
+    $('doc-info').textContent = 'Gagal baca .docx-nya. Coba save-as .docx lagi dari Word, '
+      + 'atau tempel teksnya manual.';
+  });
+}
+function zipReadFile(buf, want){
+  var u8 = new Uint8Array(buf), dv = new DataView(buf);
+  var eocd = -1, i;
+  for (i = u8.length - 22; i >= Math.max(0, u8.length - 22 - 65535); i--){
+    if (u8[i] === 0x50 && u8[i+1] === 0x4b && u8[i+2] === 0x05 && u8[i+3] === 0x06){ eocd = i; break; }
+  }
+  if (eocd < 0) return Promise.reject(new Error('bukan file zip'));
+  var n = dv.getUint16(eocd + 10, true);
+  var p = dv.getUint32(eocd + 16, true);
+  for (var k = 0; k < n; k++){
+    if (dv.getUint32(p, true) !== 0x02014b50) return Promise.reject(new Error('tabel zip rusak'));
+    var method = dv.getUint16(p + 10, true);
+    var csize = dv.getUint32(p + 20, true);
+    var nameLen = dv.getUint16(p + 28, true);
+    var extraLen = dv.getUint16(p + 30, true);
+    var commLen = dv.getUint16(p + 32, true);
+    var lho = dv.getUint32(p + 42, true);
+    var nm = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + commLen;
+    if (nm !== want) continue;
+    var lNameLen = dv.getUint16(lho + 26, true);
+    var lExtraLen = dv.getUint16(lho + 28, true);
+    var dataStart = lho + 30 + lNameLen + lExtraLen;
+    var data = u8.subarray(dataStart, dataStart + csize);
+    if (method === 0) return Promise.resolve(new TextDecoder().decode(data));
+    if (method !== 8) return Promise.reject(new Error('kompresi zip nggak didukung'));
+    return inflateRaw(data).then(function(ab){ return new TextDecoder().decode(ab); });
+  }
+  return Promise.reject(new Error(want + ' nggak ketemu di zip'));
+}
+function inflateRaw(u8){
+  if (typeof DecompressionStream === 'undefined')
+    return Promise.reject(new Error('browser nggak support DecompressionStream'));
+  var stream = new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Response(stream).arrayBuffer();
+}
+function xmlToText(x){
+  return x
+    .replace(/<w:tab\b[^>]*\/?>/g, '\t')
+    .replace(/<w:br\b[^>]*\/?>/g, '\n')
+    .replace(/<\/w:p>/g, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+// .rtf: buang kode formatnya, sisain teks murni
+function extractRtf(f){
+  $('doc-info').textContent = 'Membaca file RTF\u2026';
+  f.text().then(function(raw){
+    var t = raw
+      .replace(/\\fonttbl[\s\S]*?}/g, '').replace(/\\colortbl[\s\S]*?}/g, '')
+      .replace(/\\stylesheet[\s\S]*?}/g, '').replace(/\\info[\s\S]*?}/g, '')
+      .replace(/\\u(-?\d+)\s?\??/g, function(m, d){ var c = parseInt(d, 10); if (c < 0) c += 65536; return String.fromCharCode(c); })
+      .replace(/\\'([0-9a-f]{2})/gi, function(m, h){ return String.fromCharCode(parseInt(h, 16)); })
+      .replace(/\\par[d]?\b/g, '\n').replace(/\\line\b/g, '\n').replace(/\\tab\b/g, '\t')
+      .replace(/\\[a-z]+-?\d* ?/gi, '')
+      .replace(/[{}]/g, '')
+      .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (!appendMateri(t)){
+      $('doc-info').textContent = 'File RTF-nya kosong isinya.';
+      return;
+    }
+    $('doc-info').textContent = f.name + ' dimuat (' + t.length + ' karakter). Digabung ke kolom materi.';
+  }).catch(function(){
+    $('doc-info').textContent = 'Gagal baca RTF-nya. Tempel teksnya manual aja.';
   });
 }
 function loadScript(src){
@@ -1184,10 +1353,24 @@ function onVisChange(){
 }
 function focusTick(){
   if (!session) return;
-  var ok = document.visibilityState === 'visible' && (!foc.camOn || foc.faceOk === true);
+  // Nilai wajah cuma diitung kalau kameranya nyala DAN model deteksinya beneran siap.
+  // Kalau model gagal load, kita janjiin "fokus dihitung dari tab aja" — nah, jangan sampai
+  // semua tick malah kehitung gangguan. Kalau kamera nyala tapi wajah/kameranya ilang
+  // (ketutup, laptop ditutup), itu dihitung gangguan, BUKAN fokus.
+  var faceMatters = foc.camOn && foc.faceAvail;
+  var ok = document.visibilityState === 'visible' && (!faceMatters || foc.faceOk === true);
   if (ok) session.focusTicks++;
   else session.distractTicks++;
   updateFocusUI();
+}
+// Kamera ketutup/dimatiin paksa/track-nya mati → wajah pasti ilang, jangan nyangkut nilai lama.
+function faceLost(){
+  if (session && foc.prevFace === true) session.faceInt++;
+  foc.prevFace = false;
+  foc.faceOk = false;
+  updateFocusUI();
+  if (foc.camOn) setStatus($('face-status'),
+    'kamera berhenti/tertutup — sementara dihitung nggak fokus.', 'err');
 }
 $('btn-cam').addEventListener('click', function(){
   if (foc.camOn){
@@ -1210,6 +1393,14 @@ $('btn-cam').addEventListener('click', function(){
       setStatus($('face-status'), 'deteksi wajah: ngeload model\u2026', 'wait');
       loadFaceModels();
       foc.faceLoop = setInterval(faceCheck, 4000);
+      // Kalau laptop ditutup/kamera dicabut, track-nya jadi 'ended' atau 'mute' —
+      // elemen <video>-nya masih nampilin frame terakhir yang beku, jadi wajib kita tangkep
+      // di sini biar nggak dianggap masih fokus.
+      var vt = stream.getVideoTracks()[0];
+      if (vt){
+        vt.addEventListener('ended', faceLost);
+        vt.addEventListener('mute', faceLost);
+      }
     })
     .catch(function(){
       setStatus($('face-status'), 'Izin kamera ditolak atau nggak ada webcam.', 'err');
@@ -1245,8 +1436,43 @@ function loadFaceModels(){
         'Model wajah gagal dimuat (butuh internet). Fokus dihitung dari tab aja.', 'err');
     });
 }
+// Frame kamera ketutup fisik (stiker, tangan, lid) hampir rata warnanya — cek variasi terang
+// frame-nya. Wajah/ruangan beneran variasinya jauh lebih besar daripada frame tertutup.
+var frameCv = null;
+function frameHasSignal(){
+  try{
+    var v = $('cam');
+    if (!v.videoWidth) return false;
+    if (!frameCv){
+      frameCv = document.createElement('canvas');
+      frameCv.width = 32; frameCv.height = 24;
+    }
+    var cx = frameCv.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(v, 0, 0, 32, 24);
+    var d = cx.getImageData(0, 0, 32, 24).data;
+    var n = d.length / 4, sum = 0, sum2 = 0, i;
+    for (i = 0; i < d.length; i += 4){
+      var l = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+      sum += l; sum2 += l * l;
+    }
+    var mean = sum / n;
+    var std = Math.sqrt(Math.max(0, sum2 / n - mean * mean));
+    return std > 4;
+  } catch(e){ return false; }
+}
 function faceCheck(){
   if (!foc.camOn || !foc.faceAvail || !window.faceapi) return;
+  // 1) Track-nya masih hidup nggak? Kamera ketutup/laptop ditutup bikin track mati atau mute,
+  //    tapi <video> tetap nampilin frame terakhir — deteksi di frame beku itu yang bikin
+  //    "kamera ditutup tapi dianggap fokus".
+  var tr = foc.stream ? foc.stream.getVideoTracks()[0] : null;
+  var trackOk = !!tr && tr.readyState === 'live' && !tr.muted;
+  // 2) Frame-nya beneran ada isinya (bukan item karena kamera ketutup fisik)?
+  var frameOk = trackOk ? frameHasSignal() : false;
+  if (!trackOk || !frameOk){
+    faceLost();
+    return;
+  }
   var opts = new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 });
   Promise.resolve(window.faceapi.detectSingleFace($('cam'), opts)).then(function(res){
     var has = !!res;
@@ -1254,7 +1480,10 @@ function faceCheck(){
     foc.prevFace = has;
     foc.faceOk = has;
     updateFocusUI();
-  }).catch(function(){});
+  }).catch(function(){
+    // Deteksi error → jangan pakai nilai lama (bisa nyangkut "wajah kelihatan" selamanya).
+    faceLost();
+  });
 }
 function updateFocusUI(){
   if (!session) return;
@@ -1263,7 +1492,10 @@ function updateFocusUI(){
   $('st-tab').textContent = session.tabInt;
   $('st-face').textContent = session.faceInt;
   if (foc.camOn && foc.faceAvail){
-    if (foc.faceOk === true) setStatus($('face-status'), 'wajah kelihatan.');
+    var trk = foc.stream ? foc.stream.getVideoTracks()[0] : null;
+    var trkOk = !!trk && trk.readyState === 'live' && !trk.muted;
+    if (!trkOk) setStatus($('face-status'), 'kamera berhenti/tertutup — dihitung nggak fokus.', 'err');
+    else if (foc.faceOk === true) setStatus($('face-status'), 'wajah kelihatan.');
     else if (foc.faceOk === false) setStatus($('face-status'), 'wajah nggak kelihatan.');
   }
 }

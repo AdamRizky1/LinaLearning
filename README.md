@@ -28,8 +28,11 @@ Satu file aja (index.html), nggak ada build step.
   modul, dan visual di tiap slide (yang nggak butuh diagram pakai banner
   cadangan). Semua SVG dibikin GLM 5.3 Flash di panggilan terpisah.
 - Focus counter: tiap 5 detik dihitung fokus kalau tab kebuka dan, kalau
-  kamera nyala, wajah ke-deteksi. Pindah tab dan wajah hilang dihitung
-  gangguan.
+  kamera nyala, wajah ke-deteksi. Pindah tab, wajah hilang, DAN kamera
+  ketutup/laptop ditutup semua dihitung gangguan. Cek anti-frame-beku: track
+  kamera yang mati/mute atau frame yang hampir rata warnanya (kamera tertutup
+  fisik) otomatis dianggap wajah ilang — nilai lama nggak nyangkut. Kalau model
+  wajah gagal load, fokus dihitung dari tab aja sesuai janji pesan errornya.
 - Laporan sesi: durasi, skor fokus, gangguan, skor kuis. Bisa dikirim ke
   email orang tua, dibuka via Gmail, dikopi, atau diunduh jadi html.
 
@@ -82,7 +85,13 @@ langsung nyiapin draft laporan ke email orang tua.
 
 - Deteksi wajah pakai face-api.js (tiny face detector), dimuat dari CDN
   pas kamera dinyalakan. Kalau CDN-nya gagal, fokus dihitung dari tab aja.
-- PDF dibaca pakai pdf.js dari CDN.
+- File materi dibaca langsung di browser: .txt/.md pakai File.text(), .pdf
+  pakai pdf.js dari CDN (kalau teksnya nyaris kosong = PDF scan, otomatis
+  dicoba OCR pakai tesseract.js, maks 6 halaman pertama, indo+inggris),
+  .docx dibongkar manual (parser ZIP + DecompressionStream, nggak butuh
+  library), .rtf dibersihin dari kode formatnya. File biner lain (.doc lama,
+  .pptx, dll.) ditolak dengan pesan yang jelas, bukan dimasukin jadi sampah
+  karakter. Batas 25 MB.
 - SVG ilustrasi hasil model disaring dulu (tag script, atribut event, dan URL
   javascript:/data: dibuang) sebelum dirender ke halaman.
 - Profil dan riwayat sesi disimpan di localStorage browser; config API lama
