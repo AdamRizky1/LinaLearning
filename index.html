@@ -31,7 +31,7 @@ h2{font-size:21px;margin:0 0 10px}
 h3{font-size:17px;margin:0 0 8px}
 a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 a:hover{color:var(--accent-dk)}
-.wrap{max-width:880px;margin:0 auto;padding:0 22px 40px}
+.wrap{max-width:880px;margin:0 auto;padding:0 22px 56px}
 
 /* app header — sticky, accent rule, blur */
 .topbar{position:sticky;top:0;z-index:40;background:rgba(253,252,255,.9);
@@ -74,8 +74,8 @@ label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px;letter-s
 #screen-setup h2{margin-top:4px}
 #screen-setup form{max-width:none}
 
-.section{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);
-  border-radius:var(--r);padding:20px 24px;box-shadow:var(--shadow)}
+.section{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);
+  border-radius:var(--r);padding:22px 26px;box-shadow:var(--shadow)}
 .section h2{display:flex;align-items:center;gap:10px}
 .section > p.note{margin:2px 0 14px}
 .rule{border:0;border-top:1px solid var(--line-soft);margin:22px 0 0}
@@ -91,6 +91,13 @@ label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px;letter-s
 .warnbox{background:var(--warn-bg);border:1px solid var(--warn-line);border-left:3px solid var(--clay);
   border-radius:var(--r-sm);padding:11px 14px;font-size:14px;margin:14px 0}
 .pill-count{font-variant-numeric:tabular-nums}
+.page-head{margin-top:26px;padding-bottom:18px;border-bottom:1px solid var(--line-soft)}
+.kicker{display:block;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:7px}
+.page-head .lead{margin:0;font-size:18px;line-height:1.5;color:var(--ink);max-width:62ch}
+.report-head{margin-top:26px;padding:16px 20px;background:var(--panel-2);border:1px solid var(--line);
+  border-left:3px solid var(--accent);border-radius:var(--r)}
+.report-head h2{margin:0 0 4px}
+.report-head .note{margin:0;color:var(--ink-soft)}
 
 table.rep{border-collapse:collapse;width:100%;font-size:14.5px;margin-top:12px;
   border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
@@ -149,9 +156,9 @@ video#cam{width:168px;height:126px;background:#1c1826;border-radius:var(--r-sm);
 .camwrap .camoff{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   color:#9a93a4;font-size:12.5px;text-align:center;padding:8px;
   border:1px dashed #c9c2d4;border-radius:var(--r-sm);background:var(--panel-2)}
-.statsrow{display:flex;gap:0;flex-wrap:wrap;margin-left:auto;align-items:flex-start}
-.statsrow > div{min-width:78px;padding:0 18px;border-left:1px solid var(--line-soft)}
-.statsrow > div:first-child{border-left:0;padding-left:0}
+.statsrow{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto;align-items:stretch}
+.statsrow > div{min-width:86px;padding:10px 14px;border:1px solid var(--line-soft);
+  border-radius:var(--r-sm);background:var(--panel-2)}
 .statsrow .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
 .big{font-size:28px;font-family:"Iowan Old Style",Georgia,serif;color:var(--ink);line-height:1}
 
@@ -195,8 +202,9 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
   .brand{width:30px;height:30px;font-size:17px}
   #screen-setup{margin:20px 0;padding:20px 18px}
   .focusstrip{gap:14px}
-  .statsrow{gap:16px;margin-left:0}
-  .statsrow > div{border-left:0;padding:0;min-width:64px}
+  .statsrow{gap:8px;margin-left:0}
+  .statsrow > div{min-width:72px;padding:8px 10px}
+  .page-head .lead{font-size:16px}
   .site-footer .ft-year{margin-left:0}
 }
 </style>
@@ -231,7 +239,10 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
 </section>
 
 <section id="screen-home" class="hide">
-  <p id="hello" style="margin:28px 0 0;font-size:15px"></p>
+  <div class="page-head">
+    <span class="kicker">Beranda</span>
+    <p id="hello" class="lead"></p>
+  </div>
   <div class="warnbox hide" id="secure-warn">
     Mic dan webcam cuma jalan di <b>http://localhost</b> atau https. Sekarang halaman ini nggak
     dalam context aman, jadi rekam dan kamera nggak bisa dipakai.
@@ -279,6 +290,8 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
   </div>
 
   <div class="section">
+    <h2><span class="stepno">4</span>Susun modul, slide &amp; kuis</h2>
+    <p class="note">Tombol di bawah baru aktif setelah transkrip di langkah 3 kelar.</p>
     <button class="btn" id="btn-gen" type="button" disabled>Buat modul, slide &amp; kuis</button>
     <p class="status" id="gen-status" role="status"></p>
   </div>
@@ -334,8 +347,11 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
 </section>
 
 <section id="screen-report" class="hide">
-  <h2 style="margin-top:30px">Laporan belajar</h2>
-  <p class="note" id="rep-head"></p>
+  <div class="report-head">
+    <span class="kicker">Hasil sesi</span>
+    <h2>Laporan belajar</h2>
+    <p class="note" id="rep-head"></p>
+  </div>
   <table class="rep" id="rep-table"></table>
   <details class="transcript">
     <summary>Transkrip lengkap</summary>
