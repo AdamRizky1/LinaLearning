@@ -6,27 +6,24 @@
 <title>LinaLearning</title>
 <style>
 :root{
-  --bg:#f3f0f7; --bg2:#ebe6f1; --panel:#fdfcff; --panel-2:#f6f3fa;
+  --bg:#f3f0f7; --panel:#fdfcff; --panel-2:#f6f3fa;
   --ink:#221d2c; --ink-soft:#3b3548; --muted:#665e78; --muted-2:#8d8698;
   --line:#d9d2e0; --line-soft:#e8e2ee;
   --accent:#5c4694; --accent-dk:#443473; --accent-ink:#f4f1fb; --accent-soft:#eae5f4;
-  --clay:#9c7a2e; --clay-soft:#f2ebd9;
+  --clay:#9c7a2e;
   --danger:#9a3344; --danger-soft:#f6e3e8;
   --warn-bg:#f4ecd9; --warn-line:#d9c48f;
   --ok:#4a7c59; --ok-soft:#e7efe6;
+  --shadow-sm:0 1px 2px rgba(34,29,44,.05);
   --shadow:0 1px 2px rgba(34,29,44,.04), 0 6px 18px rgba(34,29,44,.06);
   --shadow-lg:0 10px 30px rgba(34,29,44,.16);
   --r:10px; --r-sm:7px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{
-  background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
-  background-attachment:fixed;
-  color:var(--ink);
+body{background:var(--bg);color:var(--ink);
   font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
-  -webkit-font-smoothing:antialiased;
-}
+  -webkit-font-smoothing:antialiased}
 h1,h2,h3,.serif{font-family:"Iowan Old Style","Charter","Sitka Text",Georgia,"Times New Roman",serif;
   font-weight:600;line-height:1.22;letter-spacing:-.005em}
 h1{font-size:27px;margin:0}
@@ -34,16 +31,17 @@ h2{font-size:21px;margin:0 0 10px}
 h3{font-size:17px;margin:0 0 8px}
 a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 a:hover{color:var(--accent-dk)}
-.wrap{max-width:880px;margin:0 auto;padding:0 18px 80px}
+.wrap{max-width:880px;margin:0 auto;padding:0 22px 40px}
 
-/* masthead */
-.masthead-rule{height:4px;background:linear-gradient(90deg,var(--accent) 0%,var(--accent) 38%,var(--clay) 38%,var(--clay) 62%,var(--line) 62%)}
-.topbar{background:var(--panel);border-bottom:1px solid var(--line)}
-.topbar .wrap{display:flex;align-items:center;gap:12px;padding-top:14px;padding-bottom:14px}
+/* app header — sticky, accent rule, blur */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(253,252,255,.9);
+  border-bottom:3px solid var(--accent);box-shadow:var(--shadow-sm);
+  backdrop-filter:saturate(140%) blur(6px)}
+.topbar .wrap{display:flex;align-items:center;gap:12px;padding-top:13px;padding-bottom:13px}
 .brand{flex:0 0 auto;width:34px;height:34px;border-radius:8px;background:var(--accent);color:var(--accent-ink);
   display:flex;align-items:center;justify-content:center;font:600 19px/1 "Iowan Old Style",Georgia,serif;
-  box-shadow:inset 0 -2px 0 rgba(0,0,0,.14)}
-.topbar h1{font-size:24px}
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.16)}
+.topbar h1{font-size:22px;letter-spacing:-.01em}
 .topbar .who{margin-left:auto;font-size:13px;color:var(--muted);text-align:right;line-height:1.4}
 .topbar .who b{color:var(--ink);font-weight:600}
 
@@ -70,13 +68,20 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
 textarea{min-height:120px;resize:vertical}
 label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px;letter-spacing:.01em}
 
-.section{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);
-  border-radius:var(--r);padding:18px 22px;box-shadow:var(--shadow)}
+/* onboarding setup sebagai kartu tengah */
+#screen-setup{max-width:520px;margin:40px auto 0;background:var(--panel);border:1px solid var(--line);
+  border-top:3px solid var(--accent);border-radius:var(--r);padding:24px 28px;box-shadow:var(--shadow)}
+#screen-setup h2{margin-top:4px}
+#screen-setup form{max-width:none}
+
+.section{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);
+  border-radius:var(--r);padding:20px 24px;box-shadow:var(--shadow)}
 .section h2{display:flex;align-items:center;gap:10px}
+.section > p.note{margin:2px 0 14px}
 .rule{border:0;border-top:1px solid var(--line-soft);margin:22px 0 0}
 .stepno{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
   font-family:"Iowan Old Style",Georgia,serif;font-size:14px;color:var(--accent-ink);
-  background:var(--accent);border-radius:50%;box-shadow:inset 0 -2px 0 rgba(0,0,0,.14)}
+  background:var(--accent);border-radius:50%;box-shadow:inset 0 -2px 0 rgba(0,0,0,.16)}
 .note{font-size:13.5px;color:var(--muted);line-height:1.5}
 .status{font-size:14px;margin-top:10px;min-height:1em}
 .status.ok{color:var(--accent)}
@@ -97,13 +102,19 @@ table.rep tbody tr:nth-child(even) td{background:var(--panel-2)}
 
 video#cam{width:168px;height:126px;background:#1c1826;border-radius:var(--r-sm);transform:scaleX(-1);display:block}
 
-.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-top:20px}
+/* study header bar */
+.study-head{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-top:24px;
+  padding-bottom:14px;border-bottom:1px solid var(--line-soft)}
+.study-head h2{margin:0}
+.study-head .note{margin:0}
+
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-top:22px}
 .tabs button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-2px;
   padding:9px 16px;font-size:15px;color:var(--muted);transition:color .15s,border-color .15s}
 .tabs button:hover{color:var(--ink-soft)}
 .tabs button[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
 
-.modul{max-width:70ch}
+.modul{max-width:70ch;padding-top:14px}
 .modul p{margin:11px 0}
 .modul ul{margin:8px 0;padding-left:22px}
 .modul li{margin:5px 0}
@@ -112,8 +123,7 @@ video#cam{width:168px;height:126px;background:#1c1826;border-radius:var(--r-sm);
 .slidebox{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
   padding:36px 40px;min-height:340px;display:flex;flex-direction:column;box-shadow:var(--shadow);
   position:relative;overflow:hidden}
-.slidebox::before{content:"";position:absolute;left:0;top:0;height:4px;width:100%;
-  background:linear-gradient(90deg,var(--accent),var(--clay))}
+.slidebox::before{content:"";position:absolute;left:0;top:0;height:4px;width:100%;background:var(--accent)}
 .slidebox h2{font-size:27px}
 .slidebox ul{padding-left:24px;font-size:18px;line-height:1.7;margin:8px 0}
 .slidebox .note{margin-top:auto;padding-top:18px}
@@ -132,22 +142,24 @@ video#cam{width:168px;height:126px;background:#1c1826;border-radius:var(--r-sm);
 .explain{border-left:3px solid var(--accent);background:var(--panel-2);padding:9px 13px;margin-top:12px;
   font-size:14.5px;color:var(--ink-soft);border-radius:0 var(--r-sm) var(--r-sm) 0}
 
+/* fokus strip = dashboard sesi */
 .focusstrip{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);
-  padding:14px 16px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:18px;box-shadow:var(--shadow)}
+  padding:16px 18px;display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:18px;box-shadow:var(--shadow)}
 .camwrap{position:relative;width:168px;height:126px;flex:0 0 auto}
 .camwrap .camoff{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   color:#9a93a4;font-size:12.5px;text-align:center;padding:8px;
   border:1px dashed #c9c2d4;border-radius:var(--r-sm);background:var(--panel-2)}
-.statsrow{display:flex;gap:22px;flex-wrap:wrap;margin-left:auto;align-items:flex-start}
-.statsrow > div{min-width:64px}
-.statsrow .lbl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
-.big{font-size:30px;font-family:"Iowan Old Style",Georgia,serif;color:var(--ink);line-height:1}
+.statsrow{display:flex;gap:0;flex-wrap:wrap;margin-left:auto;align-items:flex-start}
+.statsrow > div{min-width:78px;padding:0 18px;border-left:1px solid var(--line-soft)}
+.statsrow > div:first-child{border-left:0;padding-left:0}
+.statsrow .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.big{font-size:28px;font-family:"Iowan Old Style",Georgia,serif;color:var(--ink);line-height:1}
 
-details.transcript{margin-top:14px}
-details.transcript summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4px 0}
+details.transcript{margin-top:16px}
+details.transcript summary{cursor:pointer;color:var(--muted);font-size:14px;padding:6px 0}
 details.transcript summary:hover{color:var(--ink-soft)}
 details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Consolas,monospace;
-  background:#fff;border:1px solid var(--line);border-radius:var(--r-sm);padding:12px;max-height:260px;overflow:auto;margin-top:8px}
+  background:#fff;border:1px solid var(--line);border-radius:var(--r-sm);padding:12px;max-height:260px;overflow:auto;margin-top:10px}
 
 .overlay{position:fixed;inset:0;background:rgba(34,29,44,.5);display:flex;align-items:flex-start;
   justify-content:center;padding:40px 16px;z-index:50}
@@ -165,24 +177,31 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
   border-top-color:transparent;border-radius:50%;animation:sp .9s linear infinite;vertical-align:-2px;margin-right:7px}
 @keyframes sp{to{transform:rotate(360deg)}}
 
-#screen-setup h2{margin-top:8px}
-#screen-setup form{max-width:440px}
+/* site footer */
+.site-footer{border-top:1px solid var(--line);background:var(--panel);margin-top:40px}
+.site-footer .wrap{padding-top:18px;padding-bottom:22px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline}
+.site-footer .ft-brand{font-family:"Iowan Old Style",Georgia,serif;font-weight:600;color:var(--ink-soft);font-size:15px}
+.site-footer .ft-note{color:var(--muted);font-size:13px}
+.site-footer .ft-year{margin-left:auto;color:var(--muted-2);font-size:12.5px}
 
 @media (max-width:640px){
   .topbar .who{display:none}
-  .section{padding:14px 16px}
+  .section{padding:16px 18px}
   .slidebox{padding:22px 18px;min-height:260px}
   .slidebox h2{font-size:21px}
   .slidebox ul{font-size:16px}
-  h1{font-size:22px}
-  .statsrow{gap:16px}
+  h1{font-size:21px}
   .big{font-size:24px}
   .brand{width:30px;height:30px;font-size:17px}
+  #screen-setup{margin:20px 0;padding:20px 18px}
+  .focusstrip{gap:14px}
+  .statsrow{gap:16px;margin-left:0}
+  .statsrow > div{border-left:0;padding:0;min-width:64px}
+  .site-footer .ft-year{margin-left:0}
 }
 </style>
 </head>
 <body>
-<div class="masthead-rule" aria-hidden="true"></div>
 <div class="topbar">
   <div class="wrap">
     <span class="brand" aria-hidden="true">L</span>
@@ -194,13 +213,13 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
 <div class="wrap">
 
 <section id="screen-setup" class="hide">
-  <h2 style="margin-top:30px">Mulai dulu</h2>
+  <h2>Mulai dulu</h2>
   <p>Isi nama kamu sama email orang tua. Laporan belajar nanti dikirim ke email itu, jadi pastikan alamatnya benar.</p>
   <div class="warnbox hide" id="ctx-warn">
     Halaman ini dibuka di context yang nggak aman, jadi mic dan webcam nggak bisa dipakai.
     Jalankan lewat <b>http://localhost</b> atau https.
   </div>
-  <form id="form-setup" style="max-width:420px">
+  <form id="form-setup">
     <label for="in-nama">Nama siswa</label>
     <input type="text" id="in-nama" required autocomplete="name">
     <label for="in-ortu">Email orang tua</label>
@@ -272,7 +291,7 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
 </section>
 
 <section id="screen-study" class="hide">
-  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-top:26px">
+  <div class="study-head">
     <h2 id="study-title" style="margin:0"></h2>
     <span class="note pill-count" id="study-time"></span>
     <button class="btn" id="btn-finish" type="button" style="margin-left:auto">Selesai belajar</button>
@@ -335,6 +354,14 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
 </section>
 
 </div>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span class="ft-brand">LinaLearning</span>
+    <span class="ft-note">Ubah rekaman pelajaran jadi modul, slide, dan kuis.</span>
+    <span class="ft-year">2026</span>
+  </div>
+</footer>
 
 <div class="overlay hide" id="ov-settings">
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="set-title">
