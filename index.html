@@ -354,6 +354,55 @@ button.tnode:hover{border-color:var(--accent);color:var(--accent);background:#f8
 .tnode-leaf{font-weight:500;font-size:13px;color:var(--muted);background:var(--panel-2);
   border:0;box-shadow:none}
 
+/* navbar atas: Beranda / Mode belajar */
+.topnav{display:flex;align-items:center;gap:4px;margin-left:10px}
+.navlink{display:inline-flex;align-items:center;padding:7px 14px;border-radius:999px;
+  font-size:13.5px;font-weight:600;color:var(--muted);text-decoration:none;line-height:1;
+  transition:background .15s,color .15s}
+.navlink:hover{background:var(--panel-2);color:var(--ink);text-decoration:none}
+.navlink.on{background:var(--accent-soft);color:var(--accent-dk)}
+body.nav-off .topnav{display:none}
+
+/* pilihan bahan per-user + pipeline progres auto-generate */
+.gen-pick{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.gpick-lbl{font-size:12.5px;font-weight:600;color:var(--muted);margin-right:2px}
+.gpick{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:var(--panel);font:inherit;font-size:13px;font-weight:600;
+  color:var(--muted);transition:border-color .15s,background .15s,color .15s}
+.gpick::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid #c6cde0;
+  background:var(--panel);flex:0 0 auto;transition:border-color .15s,background .15s,box-shadow .15s}
+.gpick:hover{border-color:var(--accent)}
+.gpick.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-dk)}
+.gpick.on::before{border-color:var(--accent);background:var(--accent);
+  box-shadow:inset 0 0 0 3px var(--accent-soft)}
+.pipe{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:12px 16px;box-shadow:var(--shadow)}
+.pipe-note{margin:0;font-size:13.5px;color:var(--muted);flex:1 1 240px;min-width:0}
+.pipe-chips{display:flex;gap:8px;flex-wrap:wrap}
+.pchip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;
+  border:1px solid var(--line);background:var(--panel-2);font-size:12.5px;font-weight:600;
+  color:var(--muted);line-height:1;transition:all .2s;white-space:nowrap}
+.pchip .pdot{width:8px;height:8px;border-radius:50%;background:#c6cde0;flex:0 0 auto;
+  transition:background .2s}
+.pchip.run{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-dk)}
+.pchip.run .pdot{background:var(--accent);animation:pdotpulse .9s ease-in-out infinite}
+.pchip.done{border-color:transparent;background:var(--ok-soft);color:#0b7a56}
+.pchip.done .pdot{background:var(--ok)}
+.pchip.off{opacity:.45}
+.pchip.err{border-color:var(--danger);background:var(--danger-soft);color:var(--danger)}
+.pchip.err .pdot{background:var(--danger)}
+@keyframes pdotpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:.4}}
+
+/* kerangka sebelum bahan jadi */
+.skel{height:14px;border-radius:7px;margin:11px 0;
+  background:linear-gradient(90deg,var(--panel-2) 25%,#e7ebf6 50%,var(--panel-2) 75%);
+  background-size:200% 100%;animation:skelmove 1.1s linear infinite}
+.skel.w60{width:60%}
+.skel.w80{width:82%}
+.skel-fig{height:150px;border-radius:var(--r-sm)}
+@keyframes skelmove{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
 @media (max-width:640px){
   .jstep{flex:1 0 100%;max-width:none;padding:12px 12px 12px 38px}
   .jalur{padding:14px 14px}
@@ -379,6 +428,10 @@ button.tnode:hover{border-color:var(--accent);color:var(--accent);background:#f8
   .statsrow > div{min-width:78px;padding:8px 10px}
   .report-head{padding:16px 18px}
   .site-footer .ft-owner{margin-left:0}
+  .topbar h1{display:none}
+  .topnav{margin-left:2px}
+  .navlink{padding:7px 11px;font-size:12.5px}
+  .pipe{padding:12px 14px}
 }
 </style>
 </head>
@@ -387,7 +440,10 @@ button.tnode:hover{border-color:var(--accent);color:var(--accent);background:#f8
   <div class="wrap">
     <span class="brand" aria-hidden="true">L</span>
     <h1>LinaLearning</h1>
-    <span class="brandtag" aria-hidden="true">Rekam pelajaran, jadi modul &amp; kuis</span>
+    <nav class="topnav" id="topnav" aria-label="Navigasi utama">
+      <a href="#" class="navlink" id="nav-beranda">Beranda</a>
+      <a href="#" class="navlink" id="nav-study">Mode belajar</a>
+    </nav>
     <div class="who" id="who"></div>
     <button class="btn2" id="btn-logout" type="button">Ganti profil</button>
   </div>
@@ -488,10 +544,17 @@ button.tnode:hover{border-color:var(--accent);color:var(--accent);background:#f8
     <p class="sec-label">Studio &middot; Susun output</p>
     <h2><span class="stepno">4</span>Susun modul, slide &amp; kuis</h2>
     <p class="note">Tombol di bawah aktif kalau transkrip (langkah 3) atau materi (langkah 2) udah ada
-      — salah satu aja cukup. Prosesnya: referensi web dicari dulu, terus materinya disusun pakai
-      analogi yang gampang dipahami, terus digambar ilustrasinya. Butuh 2–4 menit.</p>
+      — salah satu aja cukup. Klik dan kamu langsung dibawa ke mode belajar; semua bahan yang kamu
+      pilih di bawah disusun otomatis di sana, progresnya kelihatan satu-satu. Butuh 2–4 menit.</p>
     <div class="src-chips" id="src-chips" aria-label="Sumber yang terkumpul"></div>
-    <button class="btn" id="btn-gen" type="button" disabled>Buat modul, slide &amp; kuis</button>
+    <div class="gen-pick" id="gen-pick" role="group" aria-label="Pilih bahan yang mau dibuat">
+      <span class="gpick-lbl">Dibuat otomatis:</span>
+      <button class="gpick on" type="button" data-k="modul" aria-pressed="true">Modul</button>
+      <button class="gpick on" type="button" data-k="slide" aria-pressed="true">Slide</button>
+      <button class="gpick on" type="button" data-k="peta" aria-pressed="true">Peta materi</button>
+      <button class="gpick on" type="button" data-k="kuis" aria-pressed="true">Kuis</button>
+    </div>
+    <button class="btn" id="btn-gen" type="button" disabled>Mulai belajar</button>
     <p class="status" id="gen-status" role="status"></p>
   </div>
 
@@ -507,6 +570,16 @@ button.tnode:hover{border-color:var(--accent);color:var(--accent);background:#f8
     <h2 id="study-title" style="margin:0"></h2>
     <span class="note pill-count" id="study-time"></span>
     <button class="btn" id="btn-finish" type="button" style="margin-left:auto">Selesai belajar</button>
+  </div>
+
+  <div class="pipe hide" id="pipe">
+    <p class="pipe-note" id="pipe-note" role="status"></p>
+    <div class="pipe-chips" id="pipe-chips">
+      <span class="pchip" data-k="modul"><span class="pdot" aria-hidden="true"></span>Modul</span>
+      <span class="pchip" data-k="slide"><span class="pdot" aria-hidden="true"></span>Slide</span>
+      <span class="pchip" data-k="peta"><span class="pdot" aria-hidden="true"></span>Peta</span>
+      <span class="pchip" data-k="kuis"><span class="pdot" aria-hidden="true"></span>Kuis</span>
+    </div>
   </div>
 
   <div class="jalur hide" id="jalur">
@@ -624,10 +697,17 @@ function esc(s){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
   });
 }
+function updateNav(id){
+  document.body.classList.toggle('nav-off', id === 'screen-setup');
+  var onHome = id === 'screen-home' || id === 'screen-setup';
+  $('nav-beranda').classList.toggle('on', onHome);
+  $('nav-study').classList.toggle('on', id === 'screen-study');
+}
 function show(id){
   ['screen-setup','screen-home','screen-study','screen-report'].forEach(function(s){
     $(s).classList.toggle('hide', s !== id);
   });
+  updateNav(id);
   window.scrollTo(0, 0);
 }
 function setStatus(el, msg, cls){
@@ -664,6 +744,29 @@ $('btn-logout').addEventListener('click', function(){
   profile = null;
   show('screen-setup');
 });
+
+// ===== Navbar: Beranda / Mode belajar =====
+$('nav-beranda').addEventListener('click', function(e){
+  e.preventDefault();
+  if (!profile){ show('screen-setup'); return; }
+  show('screen-home'); // sesi yang lagi jalan tetap lanjut, nggak di-stop
+});
+$('nav-study').addEventListener('click', function(e){
+  e.preventDefault();
+  gotoStudy();
+});
+function gotoStudy(){
+  if (!profile){ show('screen-setup'); return; }
+  if (session){ show('screen-study'); return; } // lanjutin sesi yang udah ada
+  var trans = $('in-trans').value.trim(), materi = $('in-materi').value.trim();
+  if (!trans && !materi){
+    show('screen-home');
+    setStatus($('gen-status'), 'Belum ada sumbernya. Isi materi (langkah 2) atau transkrip '
+      + '(langkah 3) dulu di beranda, terus klik \u201cMulai belajar\u201d.', '');
+    return;
+  }
+  autoGen(); // lompat ke mode belajar + auto-generate semua bahan yang dipilih
+}
 
 function explainErr(err){
   if (err && err.cors){
@@ -1077,7 +1180,7 @@ function looksBinary(t){
 // Tombol generate aktif kalau salah satu sumber udah ada: transkrip ATAU materi.
 function updateGenReady(){
   var trans = $('in-trans').value.trim(), materi = $('in-materi').value.trim();
-  $('btn-gen').disabled = !(trans || materi);
+  $('btn-gen').disabled = pipeBusy || !(trans || materi);
   var chips = [];
   if (audioBlob) chips.push('<span class="chip"><span class="chip-dot"></span>Audio <small>'
     + esc(audioName || 'rekaman') + '</small></span>');
@@ -1277,39 +1380,133 @@ function loadScript(src){
 
 var sessionTimeLoop = null;
 
-$('btn-gen').addEventListener('click', function(){
+// ===== Pilihan bahan yang dibuat (sesuai user, disimpan) =====
+var genSel = loadJSON('lina_gensel', null);
+if (!genSel || typeof genSel !== 'object'){
+  genSel = { modul: true, slide: true, peta: true, kuis: true };
+}
+['modul','slide','peta','kuis'].forEach(function(k){
+  if (typeof genSel[k] !== 'boolean') genSel[k] = true;
+});
+function renderGenPick(){
+  Array.prototype.forEach.call(document.querySelectorAll('#gen-pick .gpick'), function(b){
+    var on = genSel[b.getAttribute('data-k')] !== false;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+Array.prototype.forEach.call(document.querySelectorAll('#gen-pick .gpick'), function(b){
+  b.addEventListener('click', function(){
+    var k = b.getAttribute('data-k');
+    genSel[k] = !(genSel[k] !== false);
+    saveJSON('lina_gensel', genSel);
+    renderGenPick();
+  });
+});
+renderGenPick();
+
+// ===== Pipeline auto-generate: klik "Mulai belajar" / nav "Mode belajar" =====
+// Langsung lompat ke layar belajar; semua bahan yang dipilih disusun otomatis di
+// sana dengan chip progres (Modul / Slide / Peta / Kuis) + kerangka placeholder.
+var pipeBusy = false;
+function pipeSet(k, state){
+  var el = document.querySelector('#pipe-chips .pchip[data-k="' + k + '"]');
+  if (!el) return;
+  el.classList.remove('run', 'done', 'off', 'err');
+  if (state) el.classList.add(state);
+}
+function pipeNote(msg){
+  $('pipe-note').textContent = msg || '';
+}
+function pipeShow(on){
+  $('pipe').classList.toggle('hide', !on);
+  if (on){
+    ['modul','slide','peta','kuis'].forEach(function(k){
+      pipeSet(k, genSel[k] === false ? 'off' : '');
+    });
+  }
+}
+function renderSkel(){
+  $('study-title').textContent = 'Nyusun bahan belajar\u2026';
+  $('jalur').classList.add('hide');
+  $('pane-modul').innerHTML = '<div class="skel w60"></div><div class="skel"></div>'
+    + '<div class="skel w80"></div><div class="skel"></div>'
+    + '<p class="note">Nyusun modul dari sumbermu\u2026 butuh 1\u20132 menit.</p>';
+  $('slidebox').innerHTML = '<div class="skel skel-fig"></div><div class="skel w60"></div>'
+    + '<div class="skel"></div>';
+  $('sl-cnt').textContent = '';
+  $('sl-prev').disabled = true;
+  $('sl-next').disabled = true;
+  $('pane-quiz').innerHTML = '<p class="note">Kuis nyusul begitu materinya siap.</p>';
+  $('pane-peta').innerHTML = '<p class="note">Peta materi muncul begitu modulnya kelar.</p>';
+}
+function selesaiGen(err){
+  pipeBusy = false;
+  updateGenReady();
+  if (err){
+    ['modul','slide','peta','kuis'].forEach(function(k){
+      var el = document.querySelector('#pipe-chips .pchip[data-k="' + k + '"]');
+      if (el && !el.classList.contains('done') && !el.classList.contains('off')) pipeSet(k, 'err');
+    });
+    pipeNote('Gagal nyusun: ' + explainErr(err) + ' \u2014 balik ke Beranda buat coba lagi.');
+    return;
+  }
+  pipeNote('Semua bahan siap. Selamat belajar!');
+  setTimeout(function(){
+    if (!pipeBusy && $('pipe-note').textContent.indexOf('siap') >= 0) pipeShow(false);
+  }, 4000);
+}
+function autoGen(){
   var trans = $('in-trans').value.trim();
   var materi = $('in-materi').value.trim();
   if (!trans && !materi){
     setStatus($('gen-status'), 'Sumbernya masih kosong. Isi transkrip (langkah 3) atau materi '
-      + '(langkah 2) dulu — salah satu aja udah cukup.', 'err');
+      + '(langkah 2) dulu \u2014 salah satu aja udah cukup.', 'err');
     return;
   }
-  var st = $('gen-status');
-  var btn = this;
-  btn.disabled = true;
+  if (pipeBusy) return;
+  var needDoc = genSel.modul !== false || genSel.slide !== false || genSel.peta !== false;
+  var needSlide = genSel.slide !== false;
+  var needPeta = genSel.peta !== false;
+  var needQuiz = genSel.kuis !== false;
+  if (!needDoc && !needQuiz){
+    setStatus($('gen-status'), 'Semua bahan dimatiin. Nyalain minimal satu di daftar '
+      + '\u201cDibuat otomatis\u201d dulu ya.', 'err');
+    return;
+  }
+  pipeBusy = true;
+  setStatus($('gen-status'), '');
+  show('screen-study');
+  pipeShow(true);
+  renderSkel();
+  setTab('modul');
   var mDoc = cfg.chatModel, mQuiz = cfg.quizModel || cfg.chatModel;
   // Fase 1: kumpulin referensi dari web dulu biar materinya akurat.
-  setStatus(st, 'Nyari referensi di web dulu buat mastikan materinya akurat\u2026', 'wait');
+  pipeNote('Nyari referensi di web dulu biar materinya akurat\u2026');
   cariWeb(trans, materi).then(function(refs){
     var refBlock = refs.length
       ? ('\n\nREFERENSI WEB (buat cek fakta dan nambahin yang kurang; jangan nyebut sumbernya di hasil):\n'
         + refs.map(function(r){ return '- ' + r.judul + ': ' + r.isi; }).join('\n'))
       : '';
-    // Fase 2: nyusun modul & slide (GLM) paralel dengan kuis (GPT Luna).
-    setStatus(st, (refs.length ? 'Nemu ' + refs.length + ' referensi web. ' : '')
-      + 'Nyusun modul & slide [' + mDoc + '] paralel dengan kuis [' + mQuiz
-      + ']. Butuh 1\u20132 menit, jangan ditutup halamannya.', 'wait');
+    // Fase 2: nyusun tiap bahan yang user pilih. Modul+slide (GLM) paralel sama kuis (GPT Luna).
+    var bagian = [];
+    if (needDoc) bagian.push('modul' + (needSlide ? ' & slide' : '') + ' [' + mDoc + ']');
+    if (needQuiz) bagian.push('kuis [' + mQuiz + ']');
+    pipeNote((refs.length ? 'Nemu ' + refs.length + ' referensi web. ' : '')
+      + 'Nyusun ' + bagian.join(' paralel sama ') + '. Butuh 1\u20132 menit, jangan ditutup halamannya.');
     var sysDoc = 'Kamu guru di Indonesia yang merangkum pelajaran jadi bahan belajar siswa. '
       + 'Balas HANYA JSON valid tanpa penjelasan lain, tanpa markdown, dengan bentuk: '
-      + '{"judul":string,"ringkasan":string,"modul":[{"judul":string,"isi":string,"analogi":string,"poin":[string]}],'
-      + '"slide":[{"judul":string,"isi":[string],"catatan":string}],'
-      + '"kurikulum":[{"judul":string,"deskripsi":string,"menit":number}]} '
+      + '{"judul":string,"ringkasan":string,"modul":[{"judul":string,"isi":string,"analogi":string,"poin":[string]}]'
+      + (needSlide ? ',"slide":[{"judul":string,"isi":[string],"catatan":string}]' : '')
+      + (needPeta ? ',"kurikulum":[{"judul":string,"deskripsi":string,"menit":number}]' : '')
+      + '} '
       + 'Kolom "isi" boleh beberapa paragraf, pisahkan dengan dua newline. '
-      + 'Buat 4-6 bagian modul dan 8-12 slide. '
-      + 'Kolom "kurikulum" isi 3-6 tahapan urutan belajar mulai dari konsep paling dasar ke penerapan '
-      + '(JANGAN masukkan tahap kuis, itu ditambahin otomatis); "judul" singkat, "deskripsi" 1 kalimat '
-      + 'yang jelasin tahap itu, "menit" estimasi durasi belajar tahapnya dalam angka. '
+      + (needSlide ? 'Buat 4-6 bagian modul dan 8-12 slide. ' : 'Buat 4-6 bagian modul. ')
+      + (needPeta
+        ? 'Kolom "kurikulum" isi 3-6 tahapan urutan belajar mulai dari konsep paling dasar ke penerapan '
+          + '(JANGAN masukkan tahap kuis, itu ditambahin otomatis); "judul" singkat, "deskripsi" 1 kalimat '
+          + 'yang jelasin tahap itu, "menit" estimasi durasi belajar tahapnya dalam angka. '
+        : '')
       + 'Pakai bahasa Indonesia yang jelas dan enak dibaca siswa. '
       + 'Kolom "analogi" isi 1-3 kalimat analogi atau perbandingan dari kehidupan sehari-hari yang '
       + 'paling kamu yakin bikin konsep bagian itu gampang dipahami; pilih sendiri cara jelasin yang '
@@ -1335,17 +1532,19 @@ $('btn-gen').addEventListener('click', function(){
         throw err;
       };
     }
-    var pDoc = chatComplete(
+    var pDoc = !needDoc ? Promise.resolve(null) : chatComplete(
       [{ role: 'system', content: sysDoc }, { role: 'user', content: usr }],
       { temperature: 0.4, maxTokens: 8192, model: mDoc }
     ).then(function(raw){
       var d = parseLesson(raw);
-      if (!d || !Array.isArray(d.modul) || !d.modul.length || !Array.isArray(d.slide) || !d.slide.length){
+      var ok = d && Array.isArray(d.modul) && d.modul.length
+        && (!needSlide || (Array.isArray(d.slide) && d.slide.length));
+      if (!ok){
         throw new Error('JSON modul/slide nggak lengkap. Coba lagi, kalau masih gitu muat ulang halamannya.');
       }
       return d;
-    }).catch(tag('Modul & slide', mDoc));
-    var pQuiz = chatComplete(
+    }).catch(tag('Modul', mDoc));
+    var pQuiz = !needQuiz ? Promise.resolve(null) : chatComplete(
       [{ role: 'system', content: sysQuiz }, { role: 'user', content: usr }],
       { temperature: 0.4, maxTokens: 8192, model: mQuiz }
     ).then(function(raw){
@@ -1356,23 +1555,40 @@ $('btn-gen').addEventListener('click', function(){
       return d;
     }).catch(tag('Kuis', mQuiz));
     return Promise.all([pDoc, pQuiz]).then(function(rs){
+      var d0 = rs[0], d1 = rs[1];
       var data = {
-        judul: rs[0].judul, ringkasan: rs[0].ringkasan,
-        modul: rs[0].modul, slide: rs[0].slide, kuis: rs[1].kuis,
-        kurikulum: Array.isArray(rs[0].kurikulum) ? rs[0].kurikulum : null
+        judul: (d0 && d0.judul) || 'Sesi belajar',
+        ringkasan: (d0 && d0.ringkasan) || '',
+        modul: (d0 && d0.modul) || [],
+        slide: (needSlide && d0 && d0.slide) || [],
+        kuis: (d1 && d1.kuis) || [],
+        kurikulum: (needPeta && d0 && Array.isArray(d0.kurikulum)) ? d0.kurikulum : null
       };
-      // Fase 3: gambar ilustrasi SVG (hero + per bagian + per slide).
-      setStatus(st, 'Susunan kelar. Sekarang nggambar ilustrasinya\u2026', 'wait');
-      return buatIlustrasi(data).then(function(ill){
-        data.ilustrasi = ill;
-        startSession(data, trans);
+      // Fase 3: sesi langsung jalan (fokus & timer mulai sekarang), ilustrasi nyusul belakangan.
+      startSession(data, trans);
+      pipeSet('modul', data.modul.length ? 'done' : (genSel.modul === false ? 'off' : 'err'));
+      pipeSet('slide', data.slide.length ? 'done' : (genSel.slide === false ? 'off' : 'err'));
+      pipeSet('peta', (data.modul.length || data.kurikulum)
+        ? 'done' : (genSel.peta === false ? 'off' : 'err'));
+      pipeSet('kuis', data.kuis.length ? 'done' : (genSel.kuis === false ? 'off' : 'err'));
+      pipeNote('Bahan kelar. Sekarang nggambar ilustrasinya\u2026');
+      var pIll = (needDoc || needSlide)
+        ? buatIlustrasi(data).catch(function(){ return { hero: '', modul: {}, slide: {} }; })
+        : Promise.resolve(null);
+      return pIll.then(function(ill){
+        if (ill && session){
+          session.data.ilustrasi = ill;
+          renderModule(session.data);
+          if (!$('pane-slide').classList.contains('hide')) drawSlide();
+        }
+        selesaiGen(null);
       });
     });
   }).catch(function(err){
-    setStatus(st, explainErr(err), 'err');
-    btn.disabled = false;
+    selesaiGen(err);
   });
-});
+}
+$('btn-gen').addEventListener('click', autoGen);
 
 function parseLesson(raw){
   var s = String(raw).replace(/```(json)?/g, '');
@@ -1553,6 +1769,11 @@ function tickTime(){
 function renderModule(data){
   var ill = data.ilustrasi || {};
   var h = '';
+  if (!data.ringkasan && !(data.modul || []).length){
+    $('pane-modul').innerHTML = '<p class="note">Modul nggak dibuat \u2014 kamu cuma milih kuis '
+      + 'waktu mulai belajar.</p>';
+    return;
+  }
   if (ill.hero) h += '<div class="fig">' + ill.hero + '</div>';
   if (data.ringkasan) h += '<p class="note">' + esc(data.ringkasan) + '</p>';
   (data.modul || []).forEach(function(m, i){
@@ -1643,6 +1864,11 @@ function updateJalurUI(){
     : (n ? n + ' dari ' + ks.length + ' tahap selesai' : 'Mulai dari tahap pertama');
 }
 function renderPeta(data){
+  if (genSel.peta === false){
+    $('pane-peta').innerHTML = '<p class="note">Peta materi nggak dibuat \u2014 kamu nggak milih '
+      + 'peta waktu mulai belajar.</p>';
+    return;
+  }
   var h = '<ul class="tree"><li><span class="tnode tnode-root"><span>' + esc(data.judul || 'Materi')
     + '</span><small class="tsub">peta materi</small></span><ul>';
   (data.modul || []).forEach(function(m, i){
@@ -1683,7 +1909,9 @@ function renderSlides(data){
 function drawSlide(){
   var s = slideData[slideIdx];
   if (!s){
-    $('slidebox').innerHTML = '<p class="note">Nggak ada slide.</p>';
+    $('slidebox').innerHTML = '<p class="note">' + (genSel.slide === false
+      ? 'Slide nggak dibuat \u2014 kamu nggak milih slide waktu mulai belajar.'
+      : 'Nggak ada slide.') + '</p>';
     $('sl-cnt').textContent = '';
     $('sl-prev').disabled = true;
     $('sl-next').disabled = true;
@@ -1724,7 +1952,9 @@ function renderQuiz(data){
 function drawQuiz(){
   var box = $('pane-quiz');
   if (!quizData.length){
-    box.innerHTML = '<p class="note">Nggak ada soal.</p>';
+    box.innerHTML = '<p class="note">' + (genSel.kuis === false
+      ? 'Kuis nggak dibuat \u2014 kamu nggak milih kuis waktu mulai belajar.'
+      : 'Nggak ada soal.') + '</p>';
     return;
   }
   if (quizIdx >= quizData.length){
@@ -2226,6 +2456,7 @@ function resetHome(){
   $('btn-asr').disabled = false;
   setStatus($('asr-status'), '');
   setStatus($('gen-status'), '');
+  $('pipe').classList.add('hide');
   renderHistory();
 }
 

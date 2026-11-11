@@ -34,6 +34,23 @@ Struktur ala NotebookLM:
   dengan konektor garis (ul/li ::before/::after): root gradient (judul +
   label "peta materi"), cabang per modul (chip jumlah poin, klik → lompat ke
   bagiannya), daun = poin penting (maks 4 per cabang), plus node kuis.
+- **Navbar atas ala produk notebook**: di topbar ada dua link pill — "Beranda"
+  dan "Mode belajar" — dengan state aktif (pill indigo lembut). Di layar setup
+  navbar disembunyiin (body.nav-off), di layar sempit wordmark teks dimatiin
+  biar muat. Klik "Mode belajar" langsung lompat ke layar belajar (sesi lama
+  di-resume, nggak regenerate); kalau sumbernya kosong, dibalikin ke beranda
+  dengan pesan arahan.
+- **Pipeline auto-generate di layar belajar**: begitu masuk mode belajar
+  (nav "Mode belajar" atau tombol "Mulai belajar"), muncul strip progres dengan
+  4 chip status — Modul / Slide / Peta / Kuis — tiap chip berubah antre →
+  jalan (dot indigo berdenyut) → done (hijau) → dilewati (redup, kalau user
+  nggak milih) → error (merah). Selagi nyusun, pane diisi skeleton shimmer.
+  Ilustrasi digambar belakangan, pane di-render ulang begitu dateng.
+- **Pilihan bahan per-user**: chip toggle "Dibuat otomatis" di langkah 4
+  beranda (Modul, Slide, Peta materi, Kuis; tersimpan di localStorage
+  `lina_gensel`). Yang nggak dipilih nggak dipanggil ke API sama sekali —
+  prompt modul disusun dinamis sesuai pilihan — dan panenya nampilin pesan
+  ramah, bukan "Nggak ada slide." polos.
 - Prompt modul sekarang minta kolom `kurikulum` (3-6 tahap dasar→penerapan,
   tanpa kuis) — kalau model nggak kasih, frontend menyusun sendiri dari
   struktur modul, jadi fitur nggak pernah mati.
@@ -60,4 +77,4 @@ Lanjutan yang sama seperti sebelumnya:
 - Yang TETAP dijaga: nggak ada emoji, nggak ada glassmorphism berlebihan,
   bahasa santai tapi copy profesional, dan semua ID yang dipakai JS nggak
   diubah supaya fungsi & uji otomatis tetap lolos (test_rekam 23 asersi,
-  test_kurikulum 24 asersi).
+  test_kurikulum 24 asersi, test_nav_pipeline 33 asersi).
