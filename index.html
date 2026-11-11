@@ -299,6 +299,68 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.6 ui-monospace,Menlo,Con
 .site-footer .ft-owner b{font-weight:700;color:var(--ink)}
 .site-footer .ft-year{color:var(--muted-2);font-size:12.5px}
 
+/* ===== NotebookLM-style: label seksi, chip sumber, jalur belajar, peta materi ===== */
+.sec-label{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted-2);margin:0 0 8px}
+.src-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.src-chips:empty{display:none}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--ink-soft);
+  background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:6px 13px}
+.chip .chip-dot{width:8px;height:8px;border-radius:50%;background:var(--grad);flex:0 0 auto}
+.chip small{font-weight:500;color:var(--muted);font-size:12px}
+
+/* jalur belajar (kurikulum) */
+.jalur{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:18px 20px;box-shadow:var(--shadow)}
+.jalur-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.jalur-head h3{margin:0;font-size:15.5px}
+.jalur-head .note{margin:0}
+.jalur-track{display:flex;gap:8px;overflow-x:auto;padding:2px}
+.jstep{position:relative;flex:1 0 168px;max-width:230px;background:none;border:0;text-align:left;
+  font:inherit;padding:12px 12px 12px 36px;border-radius:14px;cursor:pointer;
+  transition:background .15s}
+.jstep:hover{background:var(--panel-2)}
+.jstep .jdot{position:absolute;left:12px;top:17px;width:14px;height:14px;border-radius:50%;
+  border:2px solid #c6cde0;background:var(--panel);transition:border-color .15s,background .15s}
+.jstep.cur .jdot{border-color:var(--accent);box-shadow:0 0 0 4px var(--ring)}
+.jstep.done .jdot{border-color:var(--ok);background:var(--ok)}
+.jstep.done .jdot::after{content:"\2713";position:absolute;inset:-2px;color:#fff;font-size:10px;
+  font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+.jstep .jt{display:block;font-weight:600;font-size:13.5px;color:var(--ink);line-height:1.3}
+.jstep .jd{display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+.jstep .jm{display:block;font-size:11px;color:var(--muted-2);margin-top:4px;font-weight:600}
+.jstep.cur .jt{color:var(--accent)}
+.jalur-bar{height:6px;border-radius:99px;background:var(--panel-2);overflow:hidden;margin-top:12px}
+.jalur-bar > div{height:100%;width:0;background:var(--grad);border-radius:99px;transition:width .3s}
+
+/* peta materi (mind map) */
+.tree{margin:6px 0 0;padding:0;list-style:none}
+.tree ul{list-style:none;margin:0;padding-left:28px}
+.tree li{position:relative;padding:5px 0}
+.tree ul li::before{content:"";position:absolute;left:0;top:0;height:100%;border-left:2px solid var(--line)}
+.tree ul li::after{content:"";position:absolute;left:0;top:22px;width:22px;border-top:2px solid var(--line)}
+.tree ul li:last-child::before{height:22px}
+.tnode{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;padding:8px 14px;font-size:14px;font-weight:600;
+  color:var(--ink-soft);box-shadow:var(--shadow-sm);max-width:640px;text-align:left;font-family:inherit}
+button.tnode{cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+button.tnode:hover{border-color:var(--accent);color:var(--accent);background:#f8f9ff}
+.tnode-root{background:var(--grad);color:#fff;border:0;font-family:var(--disp);
+  font-size:15px;box-shadow:0 4px 14px rgba(79,70,229,.3);flex-direction:column;align-items:flex-start;gap:2px}
+.tnode-root .tsub{font-family:"Inter",-apple-system,"Segoe UI",sans-serif;font-weight:500;font-size:11px;
+  letter-spacing:.07em;text-transform:uppercase;opacity:.85}
+.tnode .tmeta{font-size:11.5px;font-weight:600;color:var(--muted-2);
+  background:var(--panel-2);border-radius:99px;padding:2px 9px}
+.tnode-leaf{font-weight:500;font-size:13px;color:var(--muted);background:var(--panel-2);
+  border:0;box-shadow:none}
+
+@media (max-width:640px){
+  .jstep{flex:1 0 100%;max-width:none;padding:12px 12px 12px 38px}
+  .jalur{padding:14px 14px}
+  .tree ul{padding-left:16px}
+  .tnode{font-size:13.5px;max-width:none}
+}
+
 @media (max-width:640px){
   .topbar .who,.brandtag{display:none}
   .wrap{padding:0 16px 48px}
@@ -372,6 +434,7 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.6 ui-monospace,Menlo,Con
   </div>
 
   <div class="section">
+    <p class="sec-label">Sumber &middot; Audio</p>
     <h2><span class="stepno">1</span>Rekam atau upload audio</h2>
     <p class="note">Pelajaran yang mau diubah jadi modul. File bisa wav/mp3/m4a/webm/ogg, maksimal 25 MB.
       Rekaman panjang otomatis dipotong per 30 detik sesuai batas API, lalu digabung lagi.</p>
@@ -397,6 +460,7 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.6 ui-monospace,Menlo,Con
   </div>
 
   <div class="section">
+    <p class="sec-label">Sumber &middot; Materi tulisan</p>
     <h2><span class="stepno">2</span>Materi tambahan <span class="note">(opsional)</span></h2>
     <p class="note">Nggak wajib. Kalau ada rangkuman, file bab, atau PDF yang nyambung, nanti digabung
       sama transkrip waktu modul disusun. Mau tanpa rekaman juga bisa: isi materinya di sini aja,
@@ -412,6 +476,7 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.6 ui-monospace,Menlo,Con
   </div>
 
   <div class="section">
+    <p class="sec-label">Studio &middot; Transkrip</p>
     <h2><span class="stepno">3</span>Ubah suara ke teks</h2>
     <button class="btn" id="btn-asr" type="button">Mulai transkrip</button>
     <p class="status" id="asr-status" role="status"></p>
@@ -420,10 +485,12 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.6 ui-monospace,Menlo,Con
   </div>
 
   <div class="section">
+    <p class="sec-label">Studio &middot; Susun output</p>
     <h2><span class="stepno">4</span>Susun modul, slide &amp; kuis</h2>
     <p class="note">Tombol di bawah aktif kalau transkrip (langkah 3) atau materi (langkah 2) udah ada
       — salah satu aja cukup. Prosesnya: referensi web dicari dulu, terus materinya disusun pakai
       analogi yang gampang dipahami, terus digambar ilustrasinya. Butuh 2–4 menit.</p>
+    <div class="src-chips" id="src-chips" aria-label="Sumber yang terkumpul"></div>
     <button class="btn" id="btn-gen" type="button" disabled>Buat modul, slide &amp; kuis</button>
     <p class="status" id="gen-status" role="status"></p>
   </div>
@@ -440,6 +507,15 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.6 ui-monospace,Menlo,Con
     <h2 id="study-title" style="margin:0"></h2>
     <span class="note pill-count" id="study-time"></span>
     <button class="btn" id="btn-finish" type="button" style="margin-left:auto">Selesai belajar</button>
+  </div>
+
+  <div class="jalur hide" id="jalur">
+    <div class="jalur-head">
+      <h3>Jalur belajar</h3>
+      <span class="note" id="jalur-note"></span>
+    </div>
+    <div class="jalur-track" id="jalur-track"></div>
+    <div class="jalur-bar"><div id="jalur-fill"></div></div>
   </div>
 
   <div class="focusstrip">
@@ -465,6 +541,7 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.6 ui-monospace,Menlo,Con
     <button role="tab" id="tab-modul" aria-selected="true" type="button">Modul</button>
     <button role="tab" id="tab-slide" aria-selected="false" type="button">Slide</button>
     <button role="tab" id="tab-quiz" aria-selected="false" type="button">Kuis</button>
+    <button role="tab" id="tab-peta" aria-selected="false" type="button">Peta</button>
   </div>
   <div id="pane-modul" role="tabpanel" aria-labelledby="tab-modul" class="modul" style="padding-top:14px"></div>
   <div id="pane-slide" role="tabpanel" aria-labelledby="tab-slide" class="hide" style="padding-top:14px">
@@ -477,6 +554,7 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.6 ui-monospace,Menlo,Con
     <p class="note">Bisa juga pakai tombol panah kiri/kanan di keyboard.</p>
   </div>
   <div id="pane-quiz" role="tabpanel" aria-labelledby="tab-quiz" class="hide" style="padding-top:14px"></div>
+  <div id="pane-peta" role="tabpanel" aria-labelledby="tab-peta" class="hide" style="padding-top:14px"></div>
 </section>
 
 <section id="screen-report" class="hide">
@@ -633,7 +711,7 @@ function chatComplete(messages, opts){
   });
 }
 
-var audioBlob = null, audioName = '';
+var audioBlob = null, audioName = '', docName = '';
 var mediaRec = null, recChunks = [], recTimer = null, recSec = 0;
 var recArming = false, recReqTok = 0, recLastData = 0, finishDone = true, recFailMsg = null;
 
@@ -690,6 +768,7 @@ function finishRec(){
   }
   audioBlob = blob;
   audioName = 'rekaman.webm';
+  updateGenReady();
   $('rec-done').classList.remove('hide');
   $('rec-audio').src = URL.createObjectURL(blob);
   setStatus($('asr-status'), 'Rekaman ' + fmtDur(durTimer) + ' siap ditranskrip. Tekan "Mulai transkrip".');
@@ -836,6 +915,7 @@ $('in-audio').addEventListener('change', function(){
   }
   audioBlob = f;
   audioName = f.name;
+  updateGenReady();
   $('up-info').textContent = f.name + ' (' + (f.size / 1048576).toFixed(1) + ' MB)';
   readyToTranscribe('File siap ditranskrip. Tekan "Mulai transkrip".');
 });
@@ -956,6 +1036,8 @@ $('in-doc').addEventListener('change', function(){
     this.value = '';
     return;
   }
+  docName = f.name;
+  updateGenReady();
   if (/\.pdf$/i.test(f.name)){ extractPdf(f); return; }
   if (/\.docx$/i.test(f.name)){ extractDocx(f); return; }
   if (/\.rtf$/i.test(f.name)){ extractRtf(f); return; }
@@ -994,8 +1076,22 @@ function looksBinary(t){
 }
 // Tombol generate aktif kalau salah satu sumber udah ada: transkrip ATAU materi.
 function updateGenReady(){
-  var ready = !!($('in-trans').value.trim()) || !!($('in-materi').value.trim());
-  $('btn-gen').disabled = !ready;
+  var trans = $('in-trans').value.trim(), materi = $('in-materi').value.trim();
+  $('btn-gen').disabled = !(trans || materi);
+  var chips = [];
+  if (audioBlob) chips.push('<span class="chip"><span class="chip-dot"></span>Audio <small>'
+    + esc(audioName || 'rekaman') + '</small></span>');
+  if (trans) chips.push('<span class="chip"><span class="chip-dot"></span>Transkrip <small>'
+    + fmtWords(trans) + '</small></span>');
+  if (materi) chips.push('<span class="chip"><span class="chip-dot"></span>Materi tempel <small>'
+    + fmtWords(materi) + '</small></span>');
+  if (docName) chips.push('<span class="chip"><span class="chip-dot"></span>File materi <small>'
+    + esc(docName) + '</small></span>');
+  $('src-chips').innerHTML = chips.join('');
+}
+function fmtWords(s){
+  var n = s.split(/\s+/).filter(Boolean).length;
+  return n.toLocaleString('id-ID') + ' kata';
 }
 $('in-trans').addEventListener('input', updateGenReady);
 $('in-materi').addEventListener('input', updateGenReady);
@@ -1207,9 +1303,13 @@ $('btn-gen').addEventListener('click', function(){
     var sysDoc = 'Kamu guru di Indonesia yang merangkum pelajaran jadi bahan belajar siswa. '
       + 'Balas HANYA JSON valid tanpa penjelasan lain, tanpa markdown, dengan bentuk: '
       + '{"judul":string,"ringkasan":string,"modul":[{"judul":string,"isi":string,"analogi":string,"poin":[string]}],'
-      + '"slide":[{"judul":string,"isi":[string],"catatan":string}]} '
+      + '"slide":[{"judul":string,"isi":[string],"catatan":string}],'
+      + '"kurikulum":[{"judul":string,"deskripsi":string,"menit":number}]} '
       + 'Kolom "isi" boleh beberapa paragraf, pisahkan dengan dua newline. '
       + 'Buat 4-6 bagian modul dan 8-12 slide. '
+      + 'Kolom "kurikulum" isi 3-6 tahapan urutan belajar mulai dari konsep paling dasar ke penerapan '
+      + '(JANGAN masukkan tahap kuis, itu ditambahin otomatis); "judul" singkat, "deskripsi" 1 kalimat '
+      + 'yang jelasin tahap itu, "menit" estimasi durasi belajar tahapnya dalam angka. '
       + 'Pakai bahasa Indonesia yang jelas dan enak dibaca siswa. '
       + 'Kolom "analogi" isi 1-3 kalimat analogi atau perbandingan dari kehidupan sehari-hari yang '
       + 'paling kamu yakin bikin konsep bagian itu gampang dipahami; pilih sendiri cara jelasin yang '
@@ -1258,7 +1358,8 @@ $('btn-gen').addEventListener('click', function(){
     return Promise.all([pDoc, pQuiz]).then(function(rs){
       var data = {
         judul: rs[0].judul, ringkasan: rs[0].ringkasan,
-        modul: rs[0].modul, slide: rs[0].slide, kuis: rs[1].kuis
+        modul: rs[0].modul, slide: rs[0].slide, kuis: rs[1].kuis,
+        kurikulum: Array.isArray(rs[0].kurikulum) ? rs[0].kurikulum : null
       };
       // Fase 3: gambar ilustrasi SVG (hero + per bagian + per slide).
       setStatus(st, 'Susunan kelar. Sekarang nggambar ilustrasinya\u2026', 'wait');
@@ -1424,9 +1525,12 @@ function startSession(data, trans){
     answers: [],
     quizDone: false
   };
+  buildJalur(data);
+  renderPeta(data);
   renderModule(data);
   renderSlides(data);
   renderQuiz(data);
+  updateJalurUI();
   setTab('modul');
   $('study-title').textContent = data.judul || 'Sesi belajar';
   setStatus($('gen-status'), '');
@@ -1453,7 +1557,7 @@ function renderModule(data){
   if (data.ringkasan) h += '<p class="note">' + esc(data.ringkasan) + '</p>';
   (data.modul || []).forEach(function(m, i){
     h += (i ? '<hr class="rule">' : '')
-      + '<h2 style="margin-top:' + (i ? '22px' : '10px') + '">'
+      + '<h2 id="mod-' + i + '" style="margin-top:' + (i ? '22px' : '10px') + '">'
       + esc(m.judul || ('Bagian ' + (i + 1))) + '</h2>';
     if (ill.modul && ill.modul[i]) h += '<div class="fig">' + ill.modul[i] + '</div>';
     String(m.isi || '').split(/\n{2,}/).forEach(function(par){
@@ -1467,6 +1571,106 @@ function renderModule(data){
     }
   });
   $('pane-modul').innerHTML = h;
+}
+
+// ===== Jalur belajar (kurikulum) + peta materi (mind map) =====
+function buildJalur(data){
+  var nq = (data.kuis || []).length;
+  var quizStep = { judul: 'Uji pemahaman',
+    deskripsi: 'Kuis ' + nq + ' soal buat ngecek seberapa paham materinya.', menit: 10 };
+  var ks = (Array.isArray(data.kurikulum) ? data.kurikulum : []).filter(function(k){
+    return k && k.judul; }).slice(0, 6);
+  if (!ks.length){
+    // Cadangan kalau model nggak ngasih kurikulum: susun dari struktur modul.
+    ks = [{ judul: 'Mulai di sini',
+      deskripsi: String(data.ringkasan || 'Baca ringkasannya dulu buat gambaran besar.').slice(0, 110),
+      menit: 5 }];
+    (data.modul || []).forEach(function(m, i){
+      var isi = String(m.isi || '');
+      ks.push({ judul: m.judul || ('Bagian ' + (i + 1)),
+        deskripsi: String((m.poin && m.poin[0]) || m.analogi || isi).slice(0, 110),
+        menit: Math.max(4, Math.round(isi.length / 400) * 5 || 4) });
+    });
+  }
+  ks.push(quizStep);
+  session.jalur = ks;
+  session.jalurDone = ks.map(function(){ return false; });
+  var h = '';
+  ks.forEach(function(k, i){
+    h += '<button class="jstep" type="button" data-i="' + i + '">'
+      + '<span class="jdot" aria-hidden="true"></span>'
+      + '<span class="jt">' + esc(k.judul) + '</span>'
+      + (k.deskripsi ? '<span class="jd">' + esc(String(k.deskripsi)) + '</span>' : '')
+      + '<span class="jm">kurang lebih ' + (k.menit || 5) + ' menit</span>'
+      + '</button>';
+  });
+  $('jalur-track').innerHTML = h;
+  Array.prototype.forEach.call($('jalur-track').querySelectorAll('.jstep'), function(b){
+    b.addEventListener('click', function(){
+      var i = +b.getAttribute('data-i');
+      session.jalurDone[i] = true;
+      updateJalurUI();
+      jalurLompat(i);
+    });
+  });
+  $('jalur').classList.remove('hide');
+}
+function jalurLompat(i){
+  var ks = session.jalur || [];
+  if (i === ks.length - 1){
+    setTab('quiz');
+    setTimeout(function(){ $('pane-quiz').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+    return;
+  }
+  setTab('modul');
+  var nMod = (session.data.modul || []).length;
+  var target = i > 0 ? document.getElementById('mod-' + Math.min(i - 1, Math.max(nMod - 1, 0))) : $('pane-modul');
+  if (target) setTimeout(function(){ target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+}
+function updateJalurUI(){
+  if (!session || !session.jalur) return;
+  var ks = session.jalur, done = session.jalurDone || [];
+  var n = 0, cur = done.findIndex(function(d){ return !d; });
+  Array.prototype.forEach.call($('jalur-track').querySelectorAll('.jstep'), function(b, i){
+    var isDone = !!done[i] || (i === ks.length - 1 && session.quizDone);
+    b.classList.toggle('done', isDone);
+    b.classList.toggle('cur', !isDone && i === cur);
+    if (isDone) n++;
+  });
+  var pct = ks.length ? Math.round(n / ks.length * 100) : 0;
+  $('jalur-fill').style.width = pct + '%';
+  $('jalur-note').textContent = pct >= 100 ? 'Kurikulum kelar — bagus!'
+    : (n ? n + ' dari ' + ks.length + ' tahap selesai' : 'Mulai dari tahap pertama');
+}
+function renderPeta(data){
+  var h = '<ul class="tree"><li><span class="tnode tnode-root"><span>' + esc(data.judul || 'Materi')
+    + '</span><small class="tsub">peta materi</small></span><ul>';
+  (data.modul || []).forEach(function(m, i){
+    var poin = (m.poin || []).slice(0, 4);
+    h += '<li><button class="tnode" type="button" data-mod="' + i + '">'
+      + esc(m.judul || ('Bagian ' + (i + 1)))
+      + (poin.length ? '<span class="tmeta">' + poin.length + ' poin</span>' : '')
+      + '</button>';
+    if (poin.length){
+      h += '<ul>';
+      poin.forEach(function(p){ h += '<li><span class="tnode tnode-leaf">' + esc(p) + '</span></li>'; });
+      h += '</ul>';
+    }
+    h += '</li>';
+  });
+  h += '<li><button class="tnode" type="button" data-quiz="1">Uji pemahaman'
+    + '<span class="tmeta">' + (data.kuis || []).length + ' soal</span></button></li>'
+    + '</ul></li></ul>';
+  $('pane-peta').innerHTML = h;
+  Array.prototype.forEach.call($('pane-peta').querySelectorAll('button.tnode'), function(b){
+    b.addEventListener('click', function(){
+      if (b.hasAttribute('data-quiz')){ setTab('quiz'); return; }
+      var i = +b.getAttribute('data-mod');
+      setTab('modul');
+      var t = document.getElementById('mod-' + i);
+      if (t) setTimeout(function(){ t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+    });
+  });
 }
 
 var slideData = [], slideIdx = 0, quizData = [], quizIdx = 0;
@@ -1526,6 +1730,7 @@ function drawQuiz(){
   if (quizIdx >= quizData.length){
     var benar = session ? session.answers.filter(function(a){ return a.benar; }).length : 0;
     if (session) session.quizDone = true;
+    updateJalurUI();
     var msg;
     if (benar === quizData.length) msg = 'Sempurna, semua bener.';
     else if (benar >= Math.ceil(quizData.length * 0.7)) msg = 'Lumayan bagus. Yang salah dibaca lagi bagiannya.';
@@ -1582,7 +1787,8 @@ function drawQuiz(){
 }
 
 function setTab(name){
-  [['tab-modul','pane-modul'],['tab-slide','pane-slide'],['tab-quiz','pane-quiz']].forEach(function(p){
+  [['tab-modul','pane-modul'],['tab-slide','pane-slide'],['tab-quiz','pane-quiz'],
+   ['tab-peta','pane-peta']].forEach(function(p){
     var on = p[0] === 'tab-' + name;
     $(p[0]).setAttribute('aria-selected', on ? 'true' : 'false');
     $(p[1]).classList.toggle('hide', !on);
@@ -1591,6 +1797,7 @@ function setTab(name){
 $('tab-modul').addEventListener('click', function(){ setTab('modul'); });
 $('tab-slide').addEventListener('click', function(){ setTab('slide'); });
 $('tab-quiz').addEventListener('click', function(){ setTab('quiz'); });
+$('tab-peta').addEventListener('click', function(){ setTab('peta'); });
 
 var foc = { camOn: false, stream: null, faceOk: null, faceAvail: false, prevFace: null, loop: null, faceLoop: null,
             camLost: false, deadStreak: 0, lastErr: null };
@@ -2012,6 +2219,7 @@ function resetHome(){
   $('in-materi').value = '';
   $('in-doc').value = '';
   $('doc-info').textContent = '';
+  docName = '';
   $('in-trans').value = '';
   $('in-trans').classList.add('hide');
   updateGenReady();

@@ -1,45 +1,63 @@
 # Catatan desain
 
-Arah desain: **modern AI product** — seperti landing page LLM beneran (ChatGPT,
-Gemini, Perplexity) tapi tetap siap-bisnis, bukan template asal-jadi. Aturannya:
+Arah desain: **modern AI product dengan rasa NotebookLM** — source-centric,
+kurikulum jelas, warna merek tetap indigo–violet. Aturannya:
 
 - Latar terang #f7f8fc dengan **aura aurora** halus di atas halaman (radial
-  gradient indigo–violet–biru, opacity rendah, fixed) — kesan "produk AI"
-  tanpa mengganggu keterbacaan. Panel putih #ffffff, teks #0e1526.
+  gradient indigo–violet–biru, opacity rendah, fixed). Panel putih #ffffff,
+  teks #0e1526.
 - Satu warna merek: indigo #4f46e5, plus **gradient merek**
   `linear-gradient(120deg, #4f46e5, #7c3aed, #2563eb)` yang dipakai konsisten:
-  logo kotak, tombol utama, nomor step, bar atas slide & laporan, dot pill.
-  Hijau #0e9f6e cuma jawaban benar; merah #e5484d salah/bahaya; amber buat
-  analogi & peringatan.
-- Tipografi dua peran via Google Fonts: **Space Grotesk** buat display
-  (wordmark, hero, heading, angka statistik) dan **Inter** buat body. Heading
-  tracking rapat (-.02em), angka tabular. Fallback sistem kalau font gagal load.
-- **Hero di layar pertama**: logo gradient besar, pill "Dibantu AI" dengan dot
-  gradient, headline besar dengan kata kunci ber-gradient teks
-  (.grad-text, background-clip), sub-lead tenang, lalu kartu form melayang.
-  Beranda juga buka dengan hero: pill "Beranda", sapaan besar per-user
-  (#hello), satu kalimat penjelas. Glow di belakang hero via ::before radial.
-- Tombol: utama = **gradient pill** (radius 999px) dengan shadow glow lembut;
-  kedua = pill putih border halus; pilih file = pill lembut (.filebtn) dengan
-  input asli disembunyikan visual tapi tetap accessible (focus-within).
-- Kartu putih radius 16-18px, border 1px #e3e7f1, bayangan halus — konsisten
-  di semua section, fokus strip, tabel, slide, dan overlay.
-- App shell: topbar sticky blur dengan logo gradient + wordmark + tagline;
-  footer dengan identitas owner jelas ("© 2026 · Dibuat & dimiliki oleh
-  AdamRizky1") — identitas owner TIDAK boleh diganti.
-- Komponen khas: tab segmented control, tile statistik fokus (label uppercase
-  mini + angka besar Space Grotesk), slide kartu presentasi dengan bar
-  gradient atas, tabel laporan kolom-kunci berlatar abu.
+  logo kotak, tombol utama, nomor step, bar atas slide & laporan, dot chip,
+  root peta materi, progress bar jalur. Hijau #0e9f6e jawaban benar; merah
+  #e5484d salah/bahaya; amber buat analogi & peringatan.
+- Tipografi dua peran via Google Fonts: **Space Grotesk** (display: wordmark,
+  hero, heading, angka statistik, root peta) dan **Inter** (body). Fallback
+  sistem kalau font gagal load.
+
+Struktur ala NotebookLM:
+
+- **Label seksi kecil uppercase** di atas tiap kartu home: "Sumber · Audio",
+  "Sumber · Materi tulisan", "Studio · Transkrip", "Studio · Susun output" —
+  menata alur sumber → output tanpa mengubah langkah lama.
+- **Chip sumber** di kartu studio: pill kecil ber-dot gradient yang menunjukkan
+  sumber terkumpul (Audio + nama file, Transkrip + jumlah kata, Materi tempel,
+  File materi). Terisi otomatis dari updateGenReady.
+- **Jalur belajar (kurikulum)** di layar belajar, muncul sebelum fokus strip:
+  kartu tahapan horizontal (3-6 tahap dari model via kolom `kurikulum` JSON,
+  fallback disusun lokal dari modul, tahap "Uji pemahaman" selalu nempel di
+  ujung). Tiap tahap punya dot status (todo/current/done), estimasi menit, dan
+  bisa diklik → lompat ke bagian modul terkait atau tab kuis. Progress bar
+  gradient + catatan "x dari y tahap selesai". Tahap jadi done saat diklik;
+  tahap kuis done otomatis saat kuis kelar.
+- **Peta materi (mind map)**: tab keempat "Peta" di layar belajar. Tree CSS
+  dengan konektor garis (ul/li ::before/::after): root gradient (judul +
+  label "peta materi"), cabang per modul (chip jumlah poin, klik → lompat ke
+  bagiannya), daun = poin penting (maks 4 per cabang), plus node kuis.
+- Prompt modul sekarang minta kolom `kurikulum` (3-6 tahap dasar→penerapan,
+  tanpa kuis) — kalau model nggak kasih, frontend menyusun sendiri dari
+  struktur modul, jadi fitur nggak pernah mati.
+
+Lanjutan yang sama seperti sebelumnya:
+
+- Hero di layar pertama: logo gradient besar, pill "Dibantu AI", headline
+  ber-gradient teks, sub-lead, kartu form melayang; beranda buka dengan hero
+  sapaan per-user.
+- Tombol: utama gradient pill (radius 999px) shadow glow; kedua pill putih;
+  pilih file pill lembut (.filebtn) dengan input visually-hidden.
+- Kartu putih radius 16-18px, border 1px #e3e7f1, bayangan halus, konsisten.
+- App shell: topbar sticky blur; footer identitas owner jelas ("© 2026 ·
+  Dibuat & dimiliki oleh AdamRizky1") — identitas owner TIDAK boleh diganti.
+- Komponen khas: tab segmented control (kini 4: Modul/Slide/Kuis/Peta), tile
+  statistik fokus, slide kartu presentasi bar gradient, tabel laporan.
 - Meta lengkap: title deskriptif, meta description, theme-color #4f46e5,
-  favicon SVG inline (kotak gradient huruf L).
-- Prompt ilustrasi SVG disuruh pakai palet yang senada biar gambar model
-  nyambung dengan UI; SVG cadangan slide juga.
-- Semua kontrol bisa diakses keyboard (focus-visible kelihatan), tab pakai
-  role tablist/tab/tabpanel, status live pakai role=status, tombol file
-  pakai pola visually-hidden input.
-- Responsif satu kolom. Di layar sempit tagline & who disembunyikan, hero
-  dipadatkan (judul 26px), kartu dipadatkan, target sentuh tetap dijaga.
+  favicon SVG gradient huruf L.
+- Semua kontrol bisa diakses keyboard (focus-visible), tab role
+  tablist/tab/tabpanel, status role=status, tombol file pola
+  visually-hidden input.
+- Responsif satu kolom; di layar sempit hero & kartu dipadatkan, tahap jalur
+  jadi tumpukan satu kolom, target sentuh dijaga.
 - Yang TETAP dijaga: nggak ada emoji, nggak ada glassmorphism berlebihan,
-  bahasa santai tapi copy onboarding & branding profesional, dan semua ID
-  yang dipakai JS (form-setup, in-nama, in-ortu, btn-rec, dll) nggak diubah
-  supaya fungsi & uji otomatis tetap lolos.
+  bahasa santai tapi copy profesional, dan semua ID yang dipakai JS nggak
+  diubah supaya fungsi & uji otomatis tetap lolos (test_rekam 23 asersi,
+  test_kurikulum 24 asersi).
