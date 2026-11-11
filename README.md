@@ -12,6 +12,20 @@ Satu file aja (index.html), nggak ada build step.
 - Speech to text dari rekaman mic atau file audio. Audio panjang otomatis
   dipecah per 30 detik sesuai batas endpoint ASR, dire-encode jadi wav 16 kHz,
   lalu hasilnya digabung jadi satu transkrip.
+- Perekam mic yang state-nya jujur: tampilan (tombol, hitungan detik, badge
+  "MEREKAM" yang berkedip) digambar dari kondisi perekam yang sebenarnya di
+  updateRecUI(), bukan dari klik — jadi tombol/indikator nggak makin lama
+  makin beda sama kenyataan. Saat nunggu izin mic tombol jadi "Menyiapkan
+  mic…" dan di-disable (klik dobel nggak bakal bikin perekam kedua + timer
+  dobel). Perekam di-start pakai timeslice 1 detik, jadi ada denyut data buat
+  watchdog: kalau 5 detik nggak ada data masuk, rekaman di-stop sendiri dengan
+  pesan jujur. Track mic yang dicabut/error di tengah jalan bikin UI balik ke
+  kondisi diam dan sisa data tetap disimpan. Logout/reset ikut mematikan
+  perekam + timer (dulu interval bocor bikin hitungan "0 mnt 17 dtk" padahal
+  audionya cuma 1 detik). Durasi yang dilaporin diambil dari metadata audio
+  asli, bukan hitungan timer — kalau beda jauh, dikatakan terus terang.
+  Bonus: durasi webm yang Infinity dibereskan pakai trik seek, biar player
+  nampilin durasi beneran.
 - Materi tambahan opsional: tempel teks atau load file txt/pdf.
 - Generate modul, slide, dan kuis dari transkrip + materi tambahan. Salah satu
   sumber aja udah cukup: bisa dari transkrip saja (tanpa materi), atau dari

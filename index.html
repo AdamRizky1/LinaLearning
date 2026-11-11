@@ -91,6 +91,10 @@ label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px;letter-s
 .warnbox{background:var(--warn-bg);border:1px solid var(--warn-line);border-left:3px solid var(--clay);
   border-radius:var(--r-sm);padding:11px 14px;font-size:14px;margin:14px 0}
 .pill-count{font-variant-numeric:tabular-nums}
+#rec-live{font-size:12.5px;font-weight:700;letter-spacing:.07em;color:var(--danger);margin-left:12px}
+.rec-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--danger);margin-right:6px;animation:recpulse 1.1s ease-in-out infinite}
+@keyframes recpulse{0%,100%{opacity:1}50%{opacity:.2}}
+#btn-rec[disabled]{opacity:.55;cursor:wait}
 .page-head{margin-top:26px;padding-bottom:18px;border-bottom:1px solid var(--line-soft)}
 .kicker{display:block;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:7px}
 .page-head .lead{margin:0;font-size:18px;line-height:1.5;color:var(--ink);max-width:62ch}
@@ -266,6 +270,7 @@ details.transcript pre{white-space:pre-wrap;font:13px/1.55 ui-monospace,Menlo,Co
     <div id="rec-pane" style="margin-top:14px">
       <button class="btn2" id="btn-rec" type="button">Mulai rekam</button>
       <span class="note pill-count" id="rec-time" style="margin-left:12px"></span>
+      <span id="rec-live" class="hide" aria-hidden="true"><span class="rec-dot"></span>MEREKAM</span>
       <div id="rec-done" class="hide" style="margin-top:10px">
         <audio id="rec-audio" controls style="max-width:100%"></audio>
         <p class="note">Udah ke-rekam. Mau ngulang? Tekan tombol rekam lagi.</p>
@@ -457,6 +462,7 @@ $('form-setup').addEventListener('submit', function(e){
 });
 
 $('btn-logout').addEventListener('click', function(){
+  teardownRec(); // jangan ninggalin perekam + timer hidup pas keluar
   session = null;
   if (typeof foc !== 'undefined' && foc.loop) stopFocus();
   if (sessionTimeLoop){ clearTimeout(sessionTimeLoop); sessionTimeLoop = null; }
@@ -513,6 +519,117 @@ function chatComplete(messages, opts){
 
 var audioBlob = null, audioName = '';
 var mediaRec = null, recChunks = [], recTimer = null, recSec = 0;
+var recArming = false, recReqTok = 0, recLastData = 0, finishDone = true, recFailMsg = null;
+
+function killRecInterval(){
+  if (recTimer){ clearInterval(recTimer); recTimer = null; }
+}
+function recIsLive(){
+  return !!(mediaRec && mediaRec.state === 'recording');
+}
+// Satu sumber kebenaran buat tombol/pill/badge: semua kejadian (klik, izin mic,
+// stop, error, track dicabut) lewat sini, biar tampilan nggak pernah beda
+// dengan kondisi perekam yang sebenarnya.
+function updateRecUI(){
+  var b = $('btn-rec');
+  if (recArming){
+    b.disabled = true;
+    b.textContent = 'Menyiapkan mic\u2026';
+  } else {
+    b.disabled = false;
+    b.textContent = recIsLive() ? 'Stop' : 'Mulai rekam';
+  }
+  $('rec-time').textContent = recIsLive() ? fmtDur(recSec) : '';
+  $('rec-live').classList.toggle('hide', !recIsLive());
+}
+function stopRec(msg){
+  recFailMsg = msg || null;
+  killRecInterval();
+  recArming = false;
+  updateRecUI(); // tombol & indikator langsung manut sebelum onstop dateng
+  try { if (mediaRec && mediaRec.state !== 'inactive') mediaRec.stop(); } catch(e){ finishRec(); }
+  setTimeout(function(){
+    if (mediaRec && mediaRec.state !== 'inactive') finishRec(); // jaga-jaga kalau onstop nggak dateng
+  }, 2000);
+}
+function finishRec(){
+  if (finishDone) return;
+  finishDone = true;
+  killRecInterval();
+  recArming = false;
+  var durTimer = recSec, fail = recFailMsg;
+  recFailMsg = null;
+  var stream = mediaRec && mediaRec.stream;
+  if (stream) stream.getTracks().forEach(function(t){ t.stop(); });
+  var blob = new Blob(recChunks, { type: (mediaRec && mediaRec.mimeType) || 'audio/webm' });
+  recChunks = [];
+  mediaRec = null;
+  updateRecUI();
+  if (!blob.size){
+    audioBlob = null; audioName = '';
+    setStatus($('asr-status'), fail ? (fail + ' Datanya kosong, coba rekam lagi.')
+      : 'Rekaman-nya kosong \u2014 mic-nya mungkin nggak jalan. Coba rekam lagi.', 'err');
+    updateGenReady();
+    return;
+  }
+  audioBlob = blob;
+  audioName = 'rekaman.webm';
+  $('rec-done').classList.remove('hide');
+  $('rec-audio').src = URL.createObjectURL(blob);
+  setStatus($('asr-status'), 'Rekaman ' + fmtDur(durTimer) + ' siap ditranskrip. Tekan "Mulai transkrip".');
+  cekDurasiAsli(durTimer, fail); // pasang pesan yang lebih jujur kalau durasi aslinya beda
+  updateGenReady();
+}
+// WebM dari MediaRecorder kadang nggak nulis durasi (player nampilin Infinity).
+// Sekalian jujur soal durasi: kalau hitungan timer beda jauh dari durasi asli,
+// bilang ke user, jangan sok cocok.
+function cekDurasiAsli(durTimer, fail){
+  var a = $('rec-audio');
+  var done = function(d){
+    if (!isFinite(d) || d <= 0) return;
+    if (fail){
+      setStatus($('asr-status'), fail + ' Yang ke-capture ' + fmtDur(d) + ' dari hitungan '
+        + fmtDur(durTimer) + ' \u2014 datanya masih bisa ditranskrip.', 'err');
+    } else if (Math.abs(d - durTimer) > 2 && durTimer >= 3){
+      setStatus($('asr-status'), 'Durasi asli rekaman ' + fmtDur(d) + ' (timer sempat ngitung '
+        + fmtDur(durTimer) + ') \u2014 mic-nya mungkin sempat terputus, tapi datanya aman buat ditranskrip.', 'ok');
+    } // else: pesan awal dari finishRec udah pas, biarin aja
+    updateGenReady();
+  };
+  a.onloadedmetadata = function(){
+    var d = a.duration;
+    if (d === Infinity){
+      a.currentTime = 1e101; // trik benerin durasi webm yang Infinity
+      a.ontimeupdate = function(){
+        a.ontimeupdate = null;
+        d = a.duration;
+        a.currentTime = 0;
+        done(d);
+      };
+    } else done(d);
+  };
+}
+// Dipanggil pas logout/bersih-bersih layar: rekaman yang masih jalan, track mic,
+// sama timer-nya WAJIB ikut dimatiin — interval bocor bikin hitungan durasi bohong.
+function teardownRec(){
+  recReqTok++; // batalin getUserMedia yang masih ngantre
+  recArming = false;
+  finishDone = true;
+  recFailMsg = null;
+  killRecInterval();
+  if (mediaRec){
+    try { if (mediaRec.state !== 'inactive') mediaRec.stop(); } catch(e){}
+    if (mediaRec.stream) mediaRec.stream.getTracks().forEach(function(t){ t.stop(); });
+  }
+  mediaRec = null;
+  recChunks = [];
+  recSec = 0;
+  audioBlob = null;
+  audioName = '';
+  updateRecUI();
+  $('rec-done').classList.add('hide');
+  $('rec-audio').removeAttribute('src');
+}
 
 function setSrc(m){
   $('rec-pane').classList.toggle('hide', m !== 'rec');
@@ -530,34 +647,65 @@ function readyToTranscribe(msg){
 }
 
 $('btn-rec').addEventListener('click', function(){
-  var b = $('btn-rec');
-  if (mediaRec && mediaRec.state === 'recording'){ mediaRec.stop(); return; }
+  if (recArming) return; // lagi nunggu izin mic — klik dobel jangan bikin perekam kedua
+  if (recIsLive()){ stopRec(); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
     setStatus($('asr-status'), 'Browser ini nggak support rekam mic.', 'err'); return;
   }
+  killRecInterval(); // interval bocor dari sesi lain bikin hitungan ngebut
+  recReqTok++;
+  var myTok = recReqTok;
+  recArming = true;
+  finishDone = false;
+  recChunks = []; recSec = 0;
+  updateRecUI();
+  setStatus($('asr-status'), 'Nunggu izin mic\u2026', 'wait');
   navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream){
-    recChunks = []; recSec = 0;
-    mediaRec = new MediaRecorder(stream);
-    mediaRec.ondataavailable = function(e){ if (e.data && e.data.size) recChunks.push(e.data); };
-    mediaRec.onstop = function(){
+    if (myTok !== recReqTok){ // rekamannya udah batal (logout/di-reset)
       stream.getTracks().forEach(function(t){ t.stop(); });
-      clearInterval(recTimer);
-      audioBlob = new Blob(recChunks, { type: mediaRec.mimeType || 'audio/webm' });
-      audioName = 'rekaman.webm';
-      b.textContent = 'Mulai rekam';
-      $('rec-time').textContent = '';
-      $('rec-done').classList.remove('hide');
-      $('rec-audio').src = URL.createObjectURL(audioBlob);
-      readyToTranscribe('Rekaman ' + fmtDur(recSec) + ' siap ditranskrip.');
+      return;
+    }
+    recArming = false;
+    recLastData = Date.now();
+    try { mediaRec = new MediaRecorder(stream); }
+    catch(e){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      finishDone = true;
+      updateRecUI();
+      setStatus($('asr-status'), 'Browser ini nggak bisa buka perekam suaranya.', 'err');
+      return;
+    }
+    mediaRec.ondataavailable = function(e){
+      recLastData = Date.now();
+      if (e.data && e.data.size) recChunks.push(e.data);
     };
-    mediaRec.start();
-    b.textContent = 'Stop';
+    mediaRec.onerror = function(){
+      stopRec('Perekamnya error di tengah jalan.');
+    };
+    mediaRec.onstop = finishRec;
+    stream.getTracks().forEach(function(t){
+      t.addEventListener('ended', function(){
+        if (recIsLive()) stopRec('Mic-nya tiba-tiba terputus.');
+      });
+    });
+    mediaRec.start(1000); // chunk per detik: ada denyut data buat deteksi rekaman mati
     $('rec-done').classList.add('hide');
+    killRecInterval();
     recTimer = setInterval(function(){
       recSec++;
-      $('rec-time').textContent = fmtDur(recSec);
+      if (recIsLive() && !document.hidden && Date.now() - recLastData > 5000){
+        stopRec('Rekaman berhenti sendiri di tengah jalan (nggak ada data 5 detik).');
+        return;
+      }
+      updateRecUI();
     }, 1000);
+    updateRecUI();
+    setStatus($('asr-status'), 'Sedang merekam\u2026 tekan Stop kalau udah selesai.', 'wait');
   }).catch(function(){
+    if (myTok !== recReqTok) return;
+    recArming = false;
+    finishDone = true;
+    updateRecUI();
     setStatus($('asr-status'), 'Izin mic ditolak atau nggak ada mic.', 'err');
   });
 });
@@ -1743,12 +1891,7 @@ function resetHome(){
   $('hello').textContent = 'Halo, ' + profile.nama + '. Rekam atau upload pelajarannya, '
     + 'nanti diubah jadi modul, slide, sama kuis.';
   $('secure-warn').classList.toggle('hide', !!window.isSecureContext);
-  audioBlob = null;
-  audioName = '';
-  $('rec-done').classList.add('hide');
-  $('rec-audio').removeAttribute('src');
-  $('btn-rec').textContent = 'Mulai rekam';
-  $('rec-time').textContent = '';
+  teardownRec();
   $('in-audio').value = '';
   $('up-info').textContent = '';
   $('in-materi').value = '';
