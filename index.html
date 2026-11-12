@@ -617,9 +617,11 @@ body.nav-off .topnav{display:none}
       <div><div class="lbl">Wajah hilang</div><div class="big pill-count" id="st-face">0</div></div>
     </div>
   </div>
-  <p class="note" style="margin-top:8px">Skor fokus dihitung tiap 5 detik: dihitung fokus kalau tab-nya
-    kebuka, dan kalau kamera nyala, wajahnya juga ke-cekung. Pindah tab, wajah ilang, atau kamera
-    ketutup/laptop ditutup semua dihitung gangguan — jadi jangan harap nutup kamera terus tetep dapet skor.</p>
+  <p class="note" style="margin-top:8px">Skor fokus dihitung terus-menerus: wajah kelihatan bernilai 60,
+    ketenangan mic bernilai sampai 40 (skor 0&ndash;100, rata-rata 20 sampel terakhir). Wajah dicek
+    tiap 1,5 detik langsung oleh browser tanpa model online. Pindah tab, wajah ilang, atau kamera
+    mati mendadak dihitung gangguan. Kalau kameranya nggak pernah dinyalain, skor dihitung dari
+    ketenangan &amp; tab doang.</p>
 
   <div class="tabs" role="tablist" aria-label="Bahan belajar">
     <button role="tab" id="tab-modul" aria-selected="true" type="button">Modul</button>
@@ -916,7 +918,7 @@ function chatComplete(messages, opts){
 }
 
 var audioBlob = null, audioName = '', docName = '';
-var mediaRec = null, recChunks = [], recTimer = null, recSec = 0;
+var mediaRec = null, recStream = null, recChunks = [], recTimer = null, recSec = 0;
 var recArming = false, recReqTok = 0, recLastData = 0, finishDone = true, recFailMsg = null;
 
 function killRecInterval(){
@@ -962,6 +964,9 @@ function finishRec(){
   var blob = new Blob(recChunks, { type: (mediaRec && mediaRec.mimeType) || 'audio/webm' });
   recChunks = [];
   mediaRec = null;
+  recStream = null;
+  dropMicNoise();
+  if (session && !foc.analyser) tapMicNoise(); // sesi masih jalan? buka monitor noise sendiri
   updateRecUI();
   if (!blob.size){
     audioBlob = null; audioName = '';
@@ -1021,6 +1026,8 @@ function teardownRec(){
     if (mediaRec.stream) mediaRec.stream.getTracks().forEach(function(t){ t.stop(); });
   }
   mediaRec = null;
+  recStream = null;
+  dropMicNoise();
   recChunks = [];
   recSec = 0;
   audioBlob = null;
@@ -1065,6 +1072,7 @@ $('btn-rec').addEventListener('click', function(){
       return;
     }
     recArming = false;
+    recStream = stream; // dipakai juga mesin fokus (AnalyserNode) — sumber noise
     recLastData = Date.now();
     try { mediaRec = new MediaRecorder(stream); }
     catch(e){
@@ -1835,8 +1843,8 @@ function startSession(data, trans){
     data: data,
     trans: trans,
     startedAt: Date.now(),
-    focusTicks: 0,
-    distractTicks: 0,
+    scoreSum: 0,
+    scoreN: 0,
     tabInt: 0,
     faceInt: 0,
     answers: [],
@@ -2130,25 +2138,87 @@ $('tab-slide').addEventListener('click', function(){ setTab('slide'); });
 $('tab-quiz').addEventListener('click', function(){ setTab('quiz'); });
 $('tab-peta').addEventListener('click', function(){ setTab('peta'); });
 
-var foc = { camOn: false, stream: null, faceOk: null, faceAvail: false, prevFace: null, loop: null, faceLoop: null,
-            camLost: false, deadStreak: 0, lastErr: null };
+// ── Mesin fokus — logika dari alynne.edu (study-mode.tsx):
+//    skor sampel = wajah terdeteksi (60) + ketenangan mic (40 - noise*0.4),
+//    UI live pakai rata-rata 20 sampel terakhir, laporan pakai rata-rata
+//    sepanjang sesi. Wajah dicek tiap 1,5 dtk: FaceDetector API kalau browser
+//    punya, kalau nggak fallback skin-tone + frame-diff (tanpa model online).
+//    Tab yang disembunyiin = sampel 0 (gangguan); kamera mati karena pilihan
+//    pengguna = wajah nggak dinilai (kontrak lama LinaLearning tetap berlaku).
+var foc = { camOn: false, stream: null, faceOk: null, prevFace: null, anim: null, faceLoop: null,
+            camLost: false, deadStreak: 0, lastErr: null,
+            audioCtx: null, srcNode: null, analyser: null, noiseArr: null, noise: 0,
+            hist: [], noiseStream: null };
 var camReqTok = 0; // penanda permintaan getUserMedia biar klik ganda nggak bocorkan stream
-var TICK_MS = 5000;
+var FACE_CHECK_MS = 1500; // frekuensi cek wajah — persis alynne.edu
+
+// Pasang monitor noise (persis alynne.edu yang buka stream audio sendiri):
+// kalau mic perekam masih hidup, pakai itu; kalau nggak, buka stream khusus —
+// tapi cuma kalau izin mic udah pernah dikasih (nggak kejut user dengan prompt).
+function tapMicNoise(){
+  dropMicNoise();
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  var src = foc.noiseStream || recStream;
+  if (src){ attachNoiseAnalyser(src); return; }
+  if (!navigator.permissions || !navigator.permissions.query) return;
+  navigator.permissions.query({ name: 'microphone' }).then(function(p){
+    if (p.state !== 'granted' || !session || foc.analyser) return;
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(st){
+      if (!session){
+        st.getTracks().forEach(function(t){ t.stop(); });
+        return;
+      }
+      foc.noiseStream = st;
+      attachNoiseAnalyser(st);
+    }).catch(function(){});
+  }).catch(function(){});
+}
+function attachNoiseAnalyser(src){
+  try{
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx = new AC();
+    var analyser = ctx.createAnalyser();
+    analyser.fftSize = 256; // persis alynne.edu → 128 bin frekuensi
+    // Node sumber WAJIB disimpan: kalau nggak direferensikan, Chromium bisa
+    // meng-collect node-nya dan stream-nya jadi hening diam-diam.
+    foc.srcNode = ctx.createMediaStreamSource(src);
+    foc.srcNode.connect(analyser);
+    if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(function(){});
+    foc.audioCtx = ctx;
+    foc.analyser = analyser;
+    foc.noiseArr = new Uint8Array(analyser.frequencyBinCount);
+  }catch(e){}
+}
+function dropMicNoise(){
+  if (foc.audioCtx){ try{ foc.audioCtx.close(); }catch(e){} }
+  if (foc.noiseStream){
+    foc.noiseStream.getTracks().forEach(function(t){ t.stop(); });
+    foc.noiseStream = null;
+  }
+  foc.srcNode = null;
+  foc.audioCtx = null; foc.analyser = null; foc.noiseArr = null;
+}
 
 function startFocus(){
-  if (foc.loop) stopFocus();
+  if (foc.anim || foc.faceLoop) stopFocus();
   foc.camOn = false;
   foc.camLost = false;
   foc.faceOk = null;
   foc.prevFace = null;
   foc.deadStreak = 0;
-  foc.loop = setInterval(focusTick, TICK_MS);
+  foc.hist = [];
+  foc.noise = 0;
+  tapMicNoise();
+  foc.anim = requestAnimationFrame(noiseLoop);
+  foc.faceLoop = setInterval(faceCheck, FACE_CHECK_MS);
   document.addEventListener('visibilitychange', onVisChange);
   updateFocusUI();
 }
 function stopFocus(){
-  if (foc.loop){ clearInterval(foc.loop); foc.loop = null; }
+  if (foc.anim){ cancelAnimationFrame(foc.anim); foc.anim = null; }
   if (foc.faceLoop){ clearInterval(foc.faceLoop); foc.faceLoop = null; }
+  dropMicNoise();
   document.removeEventListener('visibilitychange', onVisChange);
   stopCam();
 }
@@ -2157,20 +2227,34 @@ function onVisChange(){
   if (document.hidden) session.tabInt++;
   updateFocusUI();
 }
-function focusTick(){
-  if (!session) return;
-  // Nilai wajah cuma diitung kalau kameranya nyala DAN model deteksinya beneran siap.
-  // Kalau model gagal load, kita janjiin "fokus dihitung dari tab aja" — nah, jangan sampai
-  // semua tick malah kehitung gangguan. Kalau kamera nyala tapi wajah/kameranya ilang
-  // (ketutup, laptop ditutup), itu dihitung gangguan, BUKAN fokus.
-  // Kamera mati karena pilihan pengguna (tombol) → bebas, fokus dihitung dari tab.
-  // Kamera mati KARENA DICABUT/mati sendiri (camLost) → tetap dihitung gangguan
-  // sampai pengguna nyalain lagi. Nggak boleh dapet nilai fokus gratisan.
-  var faceMatters = (foc.camOn || foc.camLost) && foc.faceAvail;
-  var ok = document.visibilityState === 'visible' && (!faceMatters || foc.faceOk === true);
-  if (ok) session.focusTicks++;
-  else session.distractTicks++;
+// Loop analisis suara + skor (rAF) — alur persis alynne.edu:
+// noise = rata-rata magnitudo frekuensi (0-100), lalu skor = wajah + ketenangan.
+function noiseLoop(){
+  if (!session){ foc.anim = null; return; }
+  if (foc.analyser){
+    foc.analyser.getByteFrequencyData(foc.noiseArr);
+    var sum = 0, i;
+    for (i = 0; i < foc.noiseArr.length; i++) sum += foc.noiseArr[i];
+    foc.noise = Math.min(100, (sum / foc.noiseArr.length / 128) * 100);
+  } else {
+    foc.noise = 0; // tanpa mic hidup (mis. sesi dari upload) → dianggap tenang
+  }
+  var score;
+  if (document.visibilityState !== 'visible'){
+    score = 0; // ninggalin tab = gangguan penuh (sampel 0, bukan cuma kehilangan 60)
+  } else {
+    var faceScore;
+    if (foc.camOn || foc.camLost) faceScore = foc.faceOk === true ? 60 : 0;
+    else faceScore = 60; // kamera mati pilihan pengguna → wajah nggak dinilai
+    var quietScore = Math.max(0, 40 - foc.noise * 0.4);
+    score = Math.round(faceScore + quietScore);
+  }
+  foc.hist.push(score);
+  if (foc.hist.length > 20) foc.hist.shift(); // jendela 20 sampel — persis alynne.edu
+  session.scoreSum += score;
+  session.scoreN++;
   updateFocusUI();
+  foc.anim = requestAnimationFrame(noiseLoop);
 }
 // Kamera ketutup/dimatiin paksa/track-nya mati → wajah pasti ilang, jangan nyangkut nilai lama.
 // msg boleh dispesifikin pemicunya (track mati / frame item / frame beku) biar
@@ -2217,9 +2301,8 @@ $('btn-cam').addEventListener('click', function(){
       // keliru dilaporkan "kamera berhenti". Play() eksplisit itu wajib.
       var pp = $('cam').play();
       if (pp && pp.catch) pp.catch(function(){});
-      setStatus($('face-status'), 'deteksi wajah: ngeload model\u2026', 'wait');
-      loadFaceModels();
-      foc.faceLoop = setInterval(faceCheck, 4000);
+      skinPrev = null;
+      setStatus($('face-status'), 'deteksi wajah jalan (cek tiap 1,5 dtk).');
       // Kalau laptop ditutup/kamera dicabut, track-nya jadi 'ended' atau 'mute' —
       // elemen <video>-nya masih nampilin frame terakhir yang beku, jadi wajib kita tangkep
       // di sini biar nggak dianggap masih fokus. 'ended' = mati beneran (UI balik ke
@@ -2248,7 +2331,7 @@ function stopCam(){
   foc.deadStreak = 0;
   foc.lastErr = null;
   framePrev = null;
-  if (foc.faceLoop){ clearInterval(foc.faceLoop); foc.faceLoop = null; }
+  skinPrev = null;
   $('cam').srcObject = null;
   $('cam').classList.add('hide');
   $('camoff').classList.remove('hide');
@@ -2266,21 +2349,44 @@ function cameraDied(){
     'kamera mati/dicabut — klik "Nyalakan kamera" buat lanjut deteksi.', 'err');
   updateFocusUI();
 }
-function loadFaceModels(){
-  if (foc.faceAvail) return;
-  loadScript('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/dist/face-api.min.js')
-    .then(function(){
-      return window.faceapi.nets.tinyFaceDetector
-        .loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights');
-    })
-    .then(function(){
-      foc.faceAvail = true;
-      setStatus($('face-status'), 'deteksi wajah siap.');
-    })
-    .catch(function(){
-      setStatus($('face-status'),
-        'Model wajah gagal dimuat (butuh internet). Fokus dihitung dari tab aja.', 'err');
-    });
+function setFace(has){
+  if (session && foc.prevFace === true && !has) session.faceInt++;
+  foc.prevFace = has;
+  foc.faceOk = has;
+  updateFocusUI();
+}
+var skinCv = null, skinPrev = null;
+// Fallback tanpa FaceDetector — ambang & rumus persis alynne.edu:
+// kulit > 15% di area tengah 40x45 DAN gerak antar-frame nggak heboh
+// (rata selisih piksel < 30; gerak heboh = mungkin lagi mangkal dari kamera).
+function skinFaceCheck(v){
+  try{
+    if (!v.videoWidth) return false;
+    if (!skinCv){
+      skinCv = document.createElement('canvas');
+      skinCv.width = 80; skinCv.height = 60;
+    }
+    var cx = skinCv.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(v, 0, 0, 80, 60);
+    var frame = cx.getImageData(0, 0, 80, 60).data;
+    var diffSum = 0, i;
+    if (skinPrev){
+      for (i = 0; i < frame.length; i += 16) diffSum += Math.abs(frame[i] - skinPrev[i]);
+    }
+    skinPrev = new Uint8ClampedArray(frame);
+    var skinPixels = 0;
+    var startX = 20, endX = 60, startY = 5, endY = 50;
+    for (var y = startY; y < endY; y++){
+      for (var x = startX; x < endX; x++){
+        var idx = (y * 80 + x) * 4;
+        var r = frame[idx], g = frame[idx + 1], b = frame[idx + 2];
+        if (r > 80 && g > 40 && b > 20 && r > g && r > b && (r - g) > 15 && r < 250) skinPixels++;
+      }
+    }
+    var skinRatio = skinPixels / ((endX - startX) * (endY - startY));
+    var motion = diffSum / (frame.length / 16) > 30;
+    return skinRatio > 0.15 && !motion;
+  } catch(e){ return false; }
 }
 // Frame kamera ketutup fisik (stiker, tangan, lid) hampir rata warnanya DAN beku
 // (nggak berubah antar cek). Kamera hidup di ruangan gelap pun tetap "gerak" gara-gara
@@ -2321,7 +2427,7 @@ function frameStatus(){
   } catch(e){ return { ready: false }; }
 }
 function faceCheck(){
-  if (!foc.camOn || !foc.faceAvail || !window.faceapi) return;
+  if (!foc.camOn) return;
   var v = $('cam');
   // 0) Self-heal: video element ke-pause (autoplay kena kebijakan browser, tab dibuka
   //    ulang, dll.) → preview item padahal track-nya hidup. Jangan langsung salahkan
@@ -2361,27 +2467,29 @@ function faceCheck(){
   }
   foc.deadStreak = 0;
   foc.lastErr = null;
-  var opts = new window.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 });
-  Promise.resolve(window.faceapi.detectSingleFace($('cam'), opts)).then(function(res){
-    var has = !!res;
-    if (session && foc.prevFace === true && !has) session.faceInt++;
-    foc.prevFace = has;
-    foc.faceOk = has;
-    updateFocusUI();
-  }).catch(function(){
-    // Deteksi error → jangan pakai nilai lama (bisa nyangkut "wajah kelihatan" selamanya).
-    faceLost();
-  });
+  // ── Deteksi wajah gaya alynne.edu: FaceDetector API kalau browser punya,
+  // kalau nggak: skin-tone + frame-diff (lihat skinFaceCheck). Tanpa model online.
+  if (window.FaceDetector){
+    new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 }).detect(v)
+      .then(function(faces){ setFace(!!(faces && faces.length)); })
+      .catch(function(){
+        // Deteksi error → jangan pakai nilai lama (bisa nyangkut "wajah kelihatan" selamanya).
+        faceLost();
+      });
+  } else {
+    setFace(skinFaceCheck(v));
+  }
 }
 function updateFocusUI(){
   if (!session) return;
-  var tot = session.focusTicks + session.distractTicks;
-  $('st-focus').textContent = tot ? Math.round(session.focusTicks / tot * 100) + '%' : '\u2013';
+  // angka yang tampil = rata-rata sepanjang sesi (sama dengan angka di laporan)
+  var pct = session.scoreN ? Math.round(session.scoreSum / session.scoreN) + '%' : '\u2013';
+  if ($('st-focus').textContent !== pct) $('st-focus').textContent = pct;
   $('st-tab').textContent = session.tabInt;
   $('st-face').textContent = session.faceInt;
   if (foc.camLost && !foc.camOn){
     setStatus($('face-status'), 'kamera mati/dicabut — klik "Nyalakan kamera".', 'err');
-  } else if (foc.camOn && foc.faceAvail){
+  } else if (foc.camOn){
     var trk = foc.stream ? foc.stream.getVideoTracks()[0] : null;
     var trkOk = !!trk && trk.readyState === 'live' && !trk.muted;
     if (!trkOk) setStatus($('face-status'),
@@ -2398,12 +2506,11 @@ $('btn-finish').addEventListener('click', finishSession);
 function finishSession(){
   if (!session) return;
   var dur = Math.round((Date.now() - session.startedAt) / 1000);
-  var tot = session.focusTicks + session.distractTicks;
   var rep = {
     ts: Date.now(),
     judul: session.data.judul || 'Sesi belajar',
     durasi: dur,
-    fokus: tot ? Math.round(session.focusTicks / tot * 100) : null,
+    fokus: session.scoreN ? Math.round(session.scoreSum / session.scoreN) : null,
     tab: session.tabInt,
     wajah: session.faceInt,
     benar: session.answers.filter(function(a){ return a.benar; }).length,
