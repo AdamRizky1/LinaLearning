@@ -661,13 +661,18 @@ body.nav-off .topnav{display:none}
 'use strict';
 // Konfigurasi API tidak lagi bisa diubah dari UI: semuanya di-hardcode di sini
 // supaya siswa tidak perlu paham base URL / key / nama model.
-// Jobdesk 2 model (berdasar keunggulan benchmark):
+// Jobdesk 2 model (berdasar keunggulan benchmark) — hanya dua ini, dua-duanya murah:
 //   - glm-5-3-flash  → modul & slide: konteks 1M, kuat menyusun dokumen panjang terstruktur
 //   - gpt-6-luna     → kuis: cepat & konsisten untuk tugas terstruktur berulang (JSON soal)
 var DEFAULT_CONFIG = {
   base: 'https://kenari.id/v1',
   key: 'kn-28b4e80cdd6d01fcd04f18ebe4a589d3dc9cb04f48d65912',
   chatModel: 'glm-5-3-flash',
+  // Cadangan kalau upstream model utama lagi mati (mis. 503 upstream unavailable).
+  // chatComplete turun ke daftar ini berurutan (duplikat dibuang), jadi rantainya
+  // saling back-up dua arah: modul/slide glm→luna, kuis luna→glm. Dites 12 Nov 2026:
+  // dua-duanya hidup; glm sempat 503 sementara (upstream down), luna tetap aman.
+  chatFallbacks: ['gpt-6-luna', 'glm-5-3-flash'],
   quizModel: 'gpt-6-luna',
   asrModel: 'whisper-large-v3-turbo',
   chatProxy: ''
@@ -772,6 +777,8 @@ function explainErr(err){
   if (err && err.code === 404) return 'Model atau endpoint API nggak ketemu (404). '
     + 'Kabari pemilik situsnya, konfigurasi API-nya perlu dibenahi.';
   if (err && err.code === 429) return 'Kena limit (429). Tunggu sebentar, coba lagi.';
+  if (err && err.code === 503) return 'Model utama & cadangan lagi gangguan di server API (503). '
+    + 'Nggak ada yang salah dari sisi kamu — coba lagi beberapa menit.';
   return (err && err.message) ? err.message : 'Gagal manggil API.';
 }
 
@@ -779,33 +786,61 @@ function chatUrl(){
   if (cfg.chatProxy) return cfg.chatProxy + encodeURIComponent(cfg.base + '/chat/completions');
   return cfg.base + '/chat/completions';
 }
+function tunggu(ms){
+  return new Promise(function(res){ setTimeout(res, ms); });
+}
+// chatComplete: panggil /chat/completions dengan rantai model + retry.
+// Urutan: model utama (opts.model || cfg.chatModel) lalu cfg.chatFallbacks.
+// Error sementara (5xx / 429 / network) dicoba ulang maksimal 2x di model yang
+// sama dengan jeda naik, baru turun ke model berikutnya — supaya gangguan
+// upstream per-model (503 all_providers_failed) nggak bikin siswa macet.
 function chatComplete(messages, opts){
   opts = opts || {};
-  return fetch(chatUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
-    body: JSON.stringify({
-      model: opts.model || cfg.chatModel,
-      messages: messages,
-      temperature: opts.temperature == null ? 0.4 : opts.temperature,
-      max_tokens: opts.maxTokens || 8192
-    })
-  }).then(function(res){
-    return res.json().catch(function(){ return {}; }).then(function(j){
-      if (!res.ok){
-        var e = new Error((j.error && j.error.message) || ('HTTP ' + res.status));
-        e.code = res.status;
-        throw e;
-      }
-      var c = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-      if (!c) throw new Error('Balasan API kosong atau bentuknya beda dari yang diperkirakan.');
-      return c;
-    });
-  }, function(){
-    var e = new Error('network');
-    e.cors = true;
-    throw e;
+  var chain = [opts.model || cfg.chatModel];
+  Array.prototype.forEach.call(cfg.chatFallbacks || [], function(m){
+    if (m && chain.indexOf(m) < 0) chain.push(m);
   });
+  function coba(i, tryNo){
+    var model = chain[i];
+    return fetch(chatUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: opts.temperature == null ? 0.4 : opts.temperature,
+        max_tokens: opts.maxTokens || 8192
+      })
+    }).then(function(res){
+      return res.json().catch(function(){ return {}; }).then(function(j){
+        if (!res.ok){
+          var e = new Error((j.error && j.error.message) || ('HTTP ' + res.status));
+          e.code = res.status;
+          var sementara = res.status >= 500 || res.status === 429;
+          if (sementara && tryNo < 2){
+            return tunggu((tryNo + 1) * 2000).then(function(){ return coba(i, tryNo + 1); });
+          }
+          if (i + 1 < chain.length) return coba(i + 1, 0);
+          throw e;
+        }
+        var c = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+        if (!c){
+          if (i + 1 < chain.length) return coba(i + 1, 0);
+          throw new Error('Balasan API kosong atau bentuknya beda dari yang diperkirakan.');
+        }
+        return c;
+      });
+    }, function(){
+      if (tryNo < 2){
+        return tunggu((tryNo + 1) * 2000).then(function(){ return coba(i, tryNo + 1); });
+      }
+      if (i + 1 < chain.length) return coba(i + 1, 0);
+      var e = new Error('network');
+      e.cors = true;
+      throw e;
+    });
+  }
+  return coba(0, 0);
 }
 
 var audioBlob = null, audioName = '', docName = '';
