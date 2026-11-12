@@ -641,12 +641,6 @@ body.nav-off .topnav{display:none}
     <summary>Transkrip lengkap</summary>
     <pre id="rep-trans"></pre>
   </details>
-  <div class="row2">
-    <button class="btn" id="btn-send" type="button">Kirim ke email orang tua</button>
-    <a class="btn2" id="lnk-gmail" href="#" target="_blank" rel="noopener">Buka di Gmail</a>
-    <button class="btn2" id="btn-copy" type="button">Salin laporan</button>
-    <button class="btn2" id="btn-dl" type="button">Unduh .html</button>
-  </div>
   <p class="status" id="send-status" role="status"></p>
   <p class="note" id="send-note"></p>
   <hr class="rule">
@@ -2317,7 +2311,7 @@ function finishSession(){
   if (sessionTimeLoop){ clearTimeout(sessionTimeLoop); sessionTimeLoop = null; }
   currentReport = rep;
   session = null;
-  showReport(rep);
+  showReport(rep, true);
 }
 
 function reportText(rep){
@@ -2344,80 +2338,86 @@ function repRows(rep){
     + '<tr><th>Ringkasan materi</th><td>' + esc(rep.ringkasan) + '</td></tr>';
 }
 
-function showReport(rep){
+// HTML email laporan (inline style, aman untuk klien email) — dikirim via MailKite
+function reportHtml(rep){
+  var th = 'padding:8px 10px;border:1px solid #e3e4f0;background:#f6f6fd;font-weight:600;width:180px;color:#1f2340';
+  var td = 'padding:8px 10px;border:1px solid #e3e4f0;color:#1f2340';
+  return '<div style="font-family:Inter,\'Segoe UI\',Arial,sans-serif;background:#f4f4fb;padding:24px">'
+    + '<div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e3e4f0">'
+    + '<div style="background:linear-gradient(120deg,#4f46e5,#7c3aed,#2563eb);padding:22px 26px;color:#ffffff">'
+    + '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.85">LinaLearning</div>'
+    + '<h1 style="margin:8px 0 0;font-size:21px;line-height:1.3">Laporan belajar \u2014 ' + esc(profile.nama) + '</h1>'
+    + '<div style="font-size:13px;opacity:.9;margin-top:4px">' + esc(fmtDate(rep.ts)) + '</div>'
+    + '</div>'
+    + '<table style="border-collapse:collapse;width:100%;font-size:14px">'
+    + '<tr><td style="' + th + '">Materi</td><td style="' + td + '">' + esc(rep.judul) + '</td></tr>'
+    + '<tr><td style="' + th + '">Durasi belajar</td><td style="' + td + '">' + fmtDur(rep.durasi) + '</td></tr>'
+    + '<tr><td style="' + th + '">Skor fokus</td><td style="' + td + '">' + (rep.fokus == null ? '-' : rep.fokus + '%') + '</td></tr>'
+    + '<tr><td style="' + th + '">Gangguan</td><td style="' + td + '">pindah tab ' + rep.tab + 'x, wajah hilang ' + rep.wajah + 'x</td></tr>'
+    + '<tr><td style="' + th + '">Skor kuis</td><td style="' + td + '">' + rep.benar + ' benar dari ' + rep.soal + ' soal</td></tr>'
+    + '<tr><td style="' + th + '">Ringkasan materi</td><td style="' + td + '">' + esc(rep.ringkasan) + '</td></tr>'
+    + '</table>'
+    + '<div style="padding:16px 26px 22px;color:#8a8ca6;font-size:12px">Laporan otomatis dari LinaLearning \u00b7 linalearning.my.id</div>'
+    + '</div></div>';
+}
+
+function showReport(rep, autoKirim){
   $('rep-head').textContent = profile.nama + ' \u2014 ' + fmtDate(rep.ts);
   $('rep-table').innerHTML = repRows(rep);
   $('rep-trans').textContent = rep.trans || '(kosong)';
-  $('lnk-gmail').href = 'https://mail.google.com/mail/?view=cm&fs=1&to='
-    + encodeURIComponent(profile.ortu)
-    + '&su=' + encodeURIComponent('Laporan belajar ' + profile.nama + ' \u2014 ' + fmtDate(rep.ts))
-    + '&body=' + encodeURIComponent(reportText(rep).slice(0, 1500));
   setStatus($('send-status'), '');
-  $('send-note').textContent = 'Kirim pertama ke email orang tua bakal diminta aktivasi sekali sama '
-    + 'FormSubmit (cek folder spam juga). Alternatif tanpa daftar: tombol "Buka di Gmail".';
+  $('send-note').textContent = 'Laporan ini dikirim otomatis ke email orang tua tiap sesi selesai \u2014 nggak perlu nekan apa-apa. '
+    + 'Kalau nggak kelihatan di inbox, cek folder spam.';
   show('screen-report');
+  if (autoKirim) setTimeout(function(){ kirimLaporan(rep, true); }, 400);
 }
 
-$('btn-send').addEventListener('click', function(){
-  var rep = currentReport;
-  if (!rep) return;
+// Kirim laporan ke email ortu via /api/mail/send (MailKite), dipicu otomatis
+// saat sesi selesai. Ngga ada lagi tombol kirim manual, jadi kalau gagal karena
+// gangguan sementara, ulang sendiri maksimal 3x dengan jeda naik (error config
+// kayak key ditolak nggak diulang — percuma).
+function kirimLaporan(rep, otomatis, cobaKe){
   var st = $('send-status');
-  setStatus(st, 'Mengirim\u2026', 'wait');
-  fetch('https://formsubmit.co/ajax/' + encodeURIComponent(profile.ortu), {
+  cobaKe = cobaKe || 1;
+  if (!profile.ortu){
+    setStatus(st, 'Laporan nggak dikirim otomatis karena email ortu belum diisi di form awal.', 'err');
+    return;
+  }
+  setStatus(st, (cobaKe > 1 ? 'Ulang kirim otomatis ke ' : 'Mengirim laporan otomatis ke ')
+    + profile.ortu + '\u2026', 'wait');
+  fetch('/api/mail/send', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      name: 'LinaLearning',
-      _subject: 'Laporan belajar ' + profile.nama + ' \u2014 ' + fmtDate(rep.ts),
-      message: reportText(rep)
+      to: profile.ortu,
+      subject: 'Laporan belajar ' + profile.nama + ' \u2014 ' + fmtDate(rep.ts),
+      html: reportHtml(rep),
+      text: reportText(rep)
     })
   }).then(function(r){
-    return r.json();
-  }).then(function(j){
-    if (j.success === 'true' || j.success === true){
-      setStatus(st, 'Terkirim ke ' + profile.ortu + '. Kalau ini kirim pertama, orang tua '
-        + 'harus konfirmasi aktivasi dari email FormSubmit dulu.', 'ok');
+    return r.json().then(function(j){ return { code: r.status, j: j }; });
+  }).then(function(x){
+    if (x.j && x.j.ok){
+      setStatus(st, 'Laporan otomatis terkirim ke ' + profile.ortu
+        + '. Orang tua tinggal cek inbox (atau folder spam).', 'ok');
+    } else if (x.j && x.j.error === 'api_key_ditolak'){
+      var e1 = new Error('server email nolak kunci API \u2014 pemilik situs perlu memperbarui kunci MailKite di server');
+      e1.fatal = true; throw e1;
+    } else if (x.j && x.j.error === 'domain_pengirim_belum_diterima'){
+      var e2 = new Error('domain pengirim belum terhubung di akun MailKite \u2014 tambahkan & verifikasi domain dulu di dashboard');
+      e2.fatal = true; throw e2;
     } else {
-      throw new Error(j.message || 'FormSubmit nolak request-nya.');
+      throw new Error((x.j && (x.j.detail || x.j.error)) || 'HTTP ' + x.code);
     }
   }).catch(function(e){
-    setStatus(st, 'Gagal kirim: ' + e.message + ' \u2014 coba tombol "Buka di Gmail".', 'err');
+    if (cobaKe < 3 && !(e && e.fatal)){
+      setStatus(st, 'Gagal kirim (' + e.message + ') \u2014 ulang otomatis sebentar lagi\u2026', 'wait');
+      setTimeout(function(){ kirimLaporan(rep, otomatis, cobaKe + 1); }, 4000 * cobaKe);
+      return;
+    }
+    setStatus(st, 'Gagal kirim: ' + e.message + ' \u2014 laporan masih tampil di halaman ini.', 'err');
   });
-});
-
-$('btn-copy').addEventListener('click', function(){
-  if (!currentReport) return;
-  navigator.clipboard.writeText(reportText(currentReport)).then(function(){
-    setStatus($('send-status'), 'Laporan dikopi ke clipboard.', 'ok');
-  }, function(){
-    setStatus($('send-status'), 'Browser nggak izinkan akses clipboard.', 'err');
-  });
-});
-
-$('btn-dl').addEventListener('click', function(){
-  var rep = currentReport;
-  if (!rep) return;
-  var html = '<!doctype html><html lang="id"><head><meta charset="utf-8">'
-    + '<title>Laporan ' + esc(profile.nama) + '</title><style>'
-    + 'body{font:15px/1.6 Georgia,serif;max-width:660px;margin:40px auto;padding:0 18px;color:#211d16}'
-    + 'table{border-collapse:collapse;width:100%}th,td{border:1px solid #d9d3c3;padding:7px 10px;text-align:left;vertical-align:top}'
-    + 'th{background:#f2ecdb;width:180px}h1{font-size:22px}'
-    + 'pre{white-space:pre-wrap;background:#f7f5ef;padding:12px;border:1px solid #d9d3c3;font:13px/1.5 ui-monospace,monospace}'
-    + '</style></head><body>'
-    + '<h1>Laporan belajar \u2014 ' + esc(profile.nama) + '</h1>'
-    + '<p>' + esc(fmtDate(rep.ts)) + '</p>'
-    + '<table>' + repRows(rep) + '</table>'
-    + '<h2>Transkrip</h2><pre>' + esc(rep.trans || '(kosong)') + '</pre>'
-    + '</body></html>';
-  var url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'laporan-belajar-' + rep.ts + '.html';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-});
+}
 
 $('btn-new').addEventListener('click', function(){
   session = null;
