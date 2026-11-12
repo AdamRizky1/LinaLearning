@@ -106,7 +106,7 @@ label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin:
 audio{accent-color:var(--accent);width:100%;max-width:100%}
 
 /* layar onboarding = mini landing page */
-#screen-setup{max-width:720px;margin:34px auto 0}
+#screen-login{max-width:720px;margin:34px auto 0}
 .setup-hero{position:relative;text-align:center;padding:26px 10px 8px}
 .setup-hero .brand-big{width:52px;height:52px;border-radius:15px;font-size:26px;margin:0 auto 18px;
   box-shadow:0 10px 28px rgba(79,70,229,.38), inset 0 1px 0 rgba(255,255,255,.28)}
@@ -445,12 +445,12 @@ body.nav-off .topnav{display:none}
       <a href="#" class="navlink" id="nav-study">Mode belajar</a>
     </nav>
     <div class="who" id="who"></div>
-    <button class="btn2" id="btn-logout" type="button">Ganti profil</button>
+    <button class="btn2" id="btn-logout" type="button">Keluar</button>
   </div>
 </div>
 <div class="wrap">
 
-<section id="screen-setup" class="hide">
+<section id="screen-login" class="hide">
   <div class="setup-hero">
     <span class="brand brand-big" aria-hidden="true">L</span>
     <div><span class="hero-pill"><span class="pill-dot" aria-hidden="true"></span>Dibantu AI</span></div>
@@ -459,22 +459,33 @@ body.nav-off .topnav{display:none}
       slide presentasi, dan kuis, lengkap dengan laporan belajar ke email orang tua.</p>
   </div>
   <div class="setup-card">
-    <h2 class="setup-title">Mulai sekarang</h2>
-    <p class="setup-desc">Isi nama siswa dan email orang tua. Laporan hasil belajar nanti dikirim ke email itu,
-      jadi pastikan alamatnya benar.</p>
+    <h2 class="setup-title" id="login-title">Masuk dulu</h2>
+    <p class="setup-desc">Satu akun per siswa: progres dan riwayat belajar ikut akun,
+      jadi tetap aman walau ganti perangkat. Laporan dikirim ke email orang tua.</p>
     <div class="warnbox hide" id="ctx-warn">
       Halaman ini dibuka di context yang nggak aman, jadi mic dan webcam nggak bisa dipakai.
       Jalankan lewat <b>http://localhost</b> atau https.
     </div>
-    <form id="form-setup">
-      <label for="in-nama">Nama siswa</label>
-      <input type="text" id="in-nama" required autocomplete="name" placeholder="cth. Rania">
-      <label for="in-ortu">Email orang tua</label>
-      <input type="email" id="in-ortu" required autocomplete="email" placeholder="cth. ortu@email.com">
+    <div class="row2" id="login-tabs">
+      <button class="btn" type="button" id="tab-masuk">Masuk</button>
+      <button class="btn2" type="button" id="tab-daftar">Daftar akun baru</button>
+    </div>
+    <form id="form-login">
+      <div id="lg-daftar-fields" class="hide">
+        <label for="lg-nama">Nama siswa</label>
+        <input type="text" id="lg-nama" autocomplete="name" placeholder="cth. Rania">
+        <label for="lg-ortu">Email orang tua</label>
+        <input type="email" id="lg-ortu" autocomplete="email" placeholder="cth. ortu@email.com">
+      </div>
+      <label for="lg-user">Username</label>
+      <input type="text" id="lg-user" required autocomplete="username" placeholder="cth. rania123">
+      <label for="lg-pass">Password</label>
+      <input type="password" id="lg-pass" required autocomplete="current-password" placeholder="minimal 6 karakter">
       <div class="row2">
-        <button class="btn" type="submit">Mulai belajar</button>
+        <button class="btn" type="submit" id="btn-login">Masuk</button>
       </div>
     </form>
+    <p class="status" id="login-status"></p>
   </div>
 </section>
 
@@ -697,13 +708,13 @@ function esc(s){
   });
 }
 function updateNav(id){
-  document.body.classList.toggle('nav-off', id === 'screen-setup');
-  var onHome = id === 'screen-home' || id === 'screen-setup';
+  document.body.classList.toggle('nav-off', id === 'screen-login');
+  var onHome = id === 'screen-home' || id === 'screen-login';
   $('nav-beranda').classList.toggle('on', onHome);
   $('nav-study').classList.toggle('on', id === 'screen-study');
 }
 function show(id){
-  ['screen-setup','screen-home','screen-study','screen-report'].forEach(function(s){
+  ['screen-login','screen-home','screen-study','screen-report'].forEach(function(s){
     $(s).classList.toggle('hide', s !== id);
   });
   updateNav(id);
@@ -725,13 +736,69 @@ function fmtDate(ts){
     ', ' + d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
 }
 
-$('form-setup').addEventListener('submit', function(e){
-  e.preventDefault();
-  var nama = $('in-nama').value.trim(), ortu = $('in-ortu').value.trim();
-  if (!nama || !ortu) return;
-  profile = { nama: nama, ortu: ortu };
+// ===== Auth: masuk/daftar via /api/auth (backend lina-auth + Turso) =====
+var meUser = null;
+function authPost(path, data, onOk, onErr){
+  fetch(path, {method: 'POST', credentials: 'same-origin',
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)})
+  .then(function(r){ return r.json().then(function(j){ return {st: r.status, j: j}; }); })
+  .then(function(x){
+    if (x.st < 400 && x.j && x.j.ok) onOk(x.j.user);
+    else onErr((x.j && x.j.error) || 'gagal_' + x.st);
+  })
+  .catch(function(){ onErr('jaringan'); });
+}
+function loginSukses(u){
+  meUser = u;
+  profile = { nama: u.nama, ortu: u.ortu_email };
   saveJSON('lina_profile', profile);
   enterHome();
+}
+function pesanAuth(err){
+  if (err === 'login_salah') return 'Username atau password salah.';
+  if (err === 'username_dipakai') return 'Username udah dipakai \u2014 pakai yang lain atau pilih tab Masuk.';
+  if (err === 'username_tidak_valid') return 'Username 3\u201324 huruf/angka (boleh titik atau underscore).';
+  if (err === 'password_terlalu_pendek') return 'Password minimal 6 karakter.';
+  if (err === 'email_ortu_tidak_valid') return 'Email orang tuanya belum valid.';
+  if (err === 'terlalu_sering') return 'Terlalu sering mencoba \u2014 tunggu beberapa menit ya.';
+  if (err === 'origin_ditolak') return 'Request diblokir \u2014 buka lewat linalearning.my.id.';
+  if (err === 'jaringan') return 'Server nggak bisa dihubungi \u2014 cek koneksi, terus coba lagi.';
+  if (err === 'db_gangguan' || err === 'db_belum_dikonfigurasi') return 'Database lagi gangguan \u2014 coba beberapa saat lagi.';
+  return 'Gagal (' + err + ') \u2014 coba lagi.';
+}
+var loginMode = 'masuk';
+function setLoginMode(m){
+  loginMode = m;
+  $('tab-masuk').className = m === 'masuk' ? 'btn' : 'btn2';
+  $('tab-daftar').className = m === 'daftar' ? 'btn' : 'btn2';
+  $('lg-daftar-fields').classList.toggle('hide', m !== 'daftar');
+  $('lg-pass').setAttribute('autocomplete', m === 'daftar' ? 'new-password' : 'current-password');
+  $('btn-login').textContent = m === 'daftar' ? 'Daftar & masuk' : 'Masuk';
+  $('login-title').textContent = m === 'daftar' ? 'Bikin akun' : 'Masuk dulu';
+  setStatus($('login-status'), '');
+}
+$('tab-masuk').addEventListener('click', function(){ setLoginMode('masuk'); });
+$('tab-daftar').addEventListener('click', function(){ setLoginMode('daftar'); });
+
+$('form-login').addEventListener('submit', function(e){
+  e.preventDefault();
+  var st = $('login-status');
+  var user = $('lg-user').value.trim(), pass = $('lg-pass').value;
+  if (loginMode === 'masuk'){
+    if (!user || !pass){ setStatus(st, 'Isi username dan password dulu.', 'err'); return; }
+    setStatus(st, 'Masuk\u2026', 'wait');
+    authPost('/api/auth/login', {username: user, password: pass}, loginSukses,
+      function(err){ setStatus(st, pesanAuth(err), 'err'); });
+    return;
+  }
+  var nama = $('lg-nama').value.trim(), ortu = $('lg-ortu').value.trim();
+  if (!nama || !ortu || !user || pass.length < 6){
+    setStatus(st, 'Lengkapi semua kolom (password minimal 6 karakter).', 'err');
+    return;
+  }
+  setStatus(st, 'Mendaftarkan akun\u2026', 'wait');
+  authPost('/api/auth/register', {username: user, password: pass, nama: nama, ortu: ortu},
+    loginSukses, function(err){ setStatus(st, pesanAuth(err), 'err'); });
 });
 
 $('btn-logout').addEventListener('click', function(){
@@ -739,15 +806,20 @@ $('btn-logout').addEventListener('click', function(){
   session = null;
   if (typeof foc !== 'undefined' && foc.loop) stopFocus();
   if (sessionTimeLoop){ clearTimeout(sessionTimeLoop); sessionTimeLoop = null; }
-  localStorage.removeItem('lina_profile');
+  // Bersihin jejak user lama di perangkat ini (perangkat kelas sering dipakai bergantian)
   profile = null;
-  show('screen-setup');
+  meUser = null;
+  histList = [];
+  saveJSON('lina_history', []);
+  localStorage.removeItem('lina_profile');
+  fetch('/api/auth/logout', {method: 'POST', credentials: 'same-origin'}).catch(function(){});
+  show('screen-login');
 });
 
 // ===== Navbar: Beranda / Mode belajar =====
 $('nav-beranda').addEventListener('click', function(e){
   e.preventDefault();
-  if (!profile){ show('screen-setup'); return; }
+  if (!profile){ show('screen-login'); return; }
   show('screen-home'); // sesi yang lagi jalan tetap lanjut, nggak di-stop
 });
 $('nav-study').addEventListener('click', function(e){
@@ -755,7 +827,7 @@ $('nav-study').addEventListener('click', function(e){
   gotoStudy();
 });
 function gotoStudy(){
-  if (!profile){ show('screen-setup'); return; }
+  if (!profile){ show('screen-login'); return; }
   if (session){ show('screen-study'); return; } // lanjutin sesi yang udah ada
   var trans = $('in-trans').value.trim(), materi = $('in-materi').value.trim();
   if (!trans && !materi){
@@ -2404,7 +2476,21 @@ function showReport(rep, autoKirim){
   $('send-note').textContent = 'Laporan ini dikirim otomatis ke email orang tua tiap sesi selesai \u2014 nggak perlu nekan apa-apa. '
     + 'Kalau nggak kelihatan di inbox, cek folder spam.';
   show('screen-report');
+  simpanLaporanDb(rep);
   if (autoKirim) setTimeout(function(){ kirimLaporan(rep, true); }, 400);
+}
+
+// Simpan laporan ke DB (Turso via /api/laporan) — fire & forget. Gagal diabaikan:
+// kirim email ortu tetap jalan, dan laporan lokal tetap tampil di layar.
+function simpanLaporanDb(rep){
+  try{
+    fetch('/api/laporan', {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ts: rep.ts, judul: rep.judul || '', durasi: rep.durasi,
+        fokus: rep.fokus, tab: rep.tab, wajah: rep.wajah, benar: rep.benar,
+        soal: rep.soal, ringkasan: rep.ringkasan || '', trans: rep.trans || ''})})
+      .catch(function(){});
+  }catch(e){}
 }
 
 // Kirim laporan ke email ortu via /api/mail/send (MailKite), dipicu otomatis
@@ -2502,8 +2588,28 @@ function enterHome(){
 
 function init(){
   if (!window.isSecureContext) $('ctx-warn').classList.remove('hide');
-  if (!profile) show('screen-setup');
-  else enterHome();
+  // Sesi login dicek dulu ke server; localStorage profile cuma cache doang.
+  fetch('/api/auth/me', {credentials: 'same-origin'})
+  .then(function(r){ return r.json().then(function(j){ return {st: r.status, j: j}; }); })
+  .then(function(x){
+    if (x.st === 200 && x.j && x.j.ok){
+      meUser = x.j.user;
+      profile = { nama: x.j.user.nama, ortu: x.j.user.ortu_email };
+      saveJSON('lina_profile', profile);
+      enterHome();
+    } else {
+      profile = null;
+      meUser = null;
+      localStorage.removeItem('lina_profile');
+      show('screen-login');
+    }
+  })
+  .catch(function(){
+    profile = null;
+    show('screen-login');
+    setStatus($('login-status'),
+      'Server nggak bisa dihubungi \u2014 cek koneksi internet, terus muat ulang.', 'err');
+  });
 }
 init();
 </script>
