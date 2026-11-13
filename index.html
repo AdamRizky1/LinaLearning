@@ -50,8 +50,8 @@ a:hover{text-decoration:underline}
   border-bottom:1px solid var(--line);
   backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px)}
 .topbar .wrap{display:flex;align-items:center;gap:10px;padding-top:10px;padding-bottom:10px}
-.brand{flex:0 0 auto;width:30px;height:30px;border-radius:8px;color:#fff;background:var(--accent);
-  display:flex;align-items:center;justify-content:center;font:700 15px/1 var(--font)}
+.brand{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:#fff;border:1px solid var(--line);
+  object-fit:cover;display:block}
 .topbar h1{font-size:15px;font-weight:600;letter-spacing:-.01em}
 .topnav{display:flex;align-items:center;gap:2px;margin-left:6px}
 .navlink{display:inline-flex;align-items:center;padding:8px 12px;border-radius:8px;
@@ -155,7 +155,7 @@ audio{accent-color:var(--accent);width:100%;max-width:100%}
 /* onboarding (item 1: hapus glow) */
 #screen-setup{max-width:520px;margin:32px auto 0}
 .setup-hero{text-align:center;padding:16px 8px 4px}
-.setup-hero .brand-big{width:46px;height:46px;border-radius:12px;font-size:22px;margin:0 auto 14px}
+.setup-hero .brand-big{width:46px;height:46px;border-radius:12px;margin:0 auto 14px}
 .hero-title{margin:10px 0 0;font-weight:700;letter-spacing:-.02em;line-height:1.2;color:var(--ink);font-size:clamp(22px,4vw,28px)}
 .grad-text{color:var(--accent)}
 .hero-sub{margin:10px auto 0;max-width:52ch;color:var(--muted);font-size:14.5px;line-height:1.6}
@@ -424,8 +424,8 @@ button.tnode:hover{border-color:var(--accent);color:var(--accent);background:var
 .site-footer{border-top:1px solid var(--line);background:var(--panel);margin-top:48px}
 .site-footer .wrap{padding-top:16px;padding-bottom:20px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
 .site-footer .ft-brand{font-weight:600;color:var(--ink);font-size:14px;display:flex;align-items:center;gap:7px}
-.ft-mark{flex:0 0 auto;width:20px;height:20px;border-radius:6px;background:var(--accent);color:#fff;
-  display:inline-flex;align-items:center;justify-content:center;font:700 11px/1 var(--font)}
+.ft-mark{flex:0 0 auto;width:20px;height:20px;border-radius:6px;background:#fff;border:1px solid var(--line);
+  object-fit:cover;display:block}
 .site-footer .ft-note{color:var(--muted);font-size:12.5px}
 .site-footer .ft-year{margin-left:auto;color:var(--muted-2);font-size:12px}
 
@@ -448,7 +448,7 @@ button.tnode:hover{border-color:var(--accent);color:var(--accent);background:var
   .topbar h1{display:none}
   .topnav{margin-left:2px}
   .navlink{padding:7px 10px;font-size:13px}
-  .brand{width:28px;height:28px;font-size:14px}
+  .brand{width:28px;height:28px}
   .setup-card{padding:18px}
   .hero-title{font-size:22px}
   .stepper{max-width:none}
@@ -501,7 +501,7 @@ select{font:inherit;color:inherit}
 <body>
 <div class="topbar">
   <div class="wrap">
-    <span class="brand" aria-hidden="true">L</span>
+    <img class="brand" src="logo.png" alt="LinaLearning" width="30" height="30">
     <h1>LinaLearning</h1>
     <nav class="topnav" id="topnav" aria-label="Navigasi utama">
       <a href="#" class="navlink" id="nav-beranda">Beranda</a>
@@ -607,7 +607,7 @@ select{font:inherit;color:inherit}
 </section>
 <section id="screen-login" class="hide">
   <div class="setup-hero">
-    <span class="brand brand-big" aria-hidden="true">L</span>
+    <img class="brand brand-big" src="logo.png" alt="Logo LinaLearning" width="46" height="46">
     <h2 class="hero-title">Rekam pelajaran, jadi <span class="grad-text">modul, slide &amp; kuis</span></h2>
     <p class="hero-sub">Cukup bicara di depan mic atau upload materinya, AI menyusun modul baca,
       slide presentasi, dan kuis, lengkap dengan laporan belajar ke email orang tua.</p>
@@ -869,7 +869,7 @@ select{font:inherit;color:inherit}
 
 <footer class="site-footer">
   <div class="wrap">
-    <span class="ft-brand"><span class="ft-mark" aria-hidden="true">L</span>LinaLearning</span>
+    <span class="ft-brand"><img class="ft-mark" src="logo.png" alt="" width="20" height="20">LinaLearning</span>
     <span class="ft-note">Rekam pelajaran, ubah jadi modul baca, slide, dan kuis.</span>
     <span class="ft-owner">&copy; 2026 &middot; Dibuat &amp; dimiliki oleh <b>D'Nameless</b></span>
   </div>
