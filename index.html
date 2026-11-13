@@ -657,9 +657,12 @@ select{font:inherit;color:inherit}
       <p class="note" style="margin-top:10px">Skor fokus cuma dihitung pas detektornya jalan (kamera nyala):
         wajah kelihatan bernilai 60, ketenangan mic bernilai sampai 40 (skor 0&ndash;100, rata-rata
         20 sampel terakhir). Wajah dicek tiap 1,5 detik langsung oleh browser tanpa model online.
+        Ruangan remang? Kecerahan frame diterangin otomatis (gain) dan auto-exposure kamera diminta
+        nyala, biar wajah tetap kebaca.
         Pindah tab atau wajah ilang dihitung gangguan. Rata-rata skor di bawah 35 yang bertahan
         beberapa detik nge-munculin peringatan (kecepatannya ikut &ldquo;Sensitivitas&rdquo;, tersimpan
-        di browser ini).</p>
+        di browser ini). Kamera nggak dinyalain = detektor nggak jalan = skor nggak dihitung
+        (tampil &ndash;), persis sistem fokus di alynne.</p>
     </div>
   </div>
 
@@ -716,7 +719,7 @@ select{font:inherit;color:inherit}
   <div class="wrap">
     <span class="ft-brand"><span class="ft-mark" aria-hidden="true">L</span>LinaLearning</span>
     <span class="ft-note">Rekam pelajaran, ubah jadi modul baca, slide, dan kuis.</span>
-    <span class="ft-owner">&copy; 2026 &middot; Dibuat &amp; dimiliki oleh <b>AdamRizky1</b></span>
+    <span class="ft-owner">&copy; 2026 &middot; Dibuat &amp; dimiliki oleh <b>D'Nameless</b></span>
   </div>
 </footer>
 
@@ -1829,6 +1832,36 @@ function wikiAmbil(title){
 
 // ===== Ilustrator: diagram SVG buat hero, tiap bagian modul, dan slide =====
 function buatIlustrasi(data){
+  var ill = { hero: '', modul: {}, slide: {} };
+  // Render ulang tiap ada bagian yang kelar — slide/modul nampilin placeholder
+  // (defaultSlideSvg) dulu, lalu ke-swap begitu SVG-nya datang.
+  function renderPartial(){
+    if (!session) return;
+    session.data.ilustrasi = ill;
+    renderModule(session.data);
+    if (!$('pane-slide').classList.contains('hide')) drawSlide();
+  }
+  // Dulu: SATU panggilan LLM gede (hero + semua modul + semua slide) → lama,
+  // karena waktu tunggu = jumlah token SEMUA gambar. Sekarang dipecah jadi
+  // beberapa panggilan kecil PARALEL → selesai selambat-lambatnya satu chunk,
+  // bukan jumlah semuanya; slide ke-swap progresif; satu chunk gagal nggak
+  // bawa jatuh yang lain (yang gagal tetap pakai visual cadangan).
+  var rules = 'Aturan tiap SVG: mulai <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 280">, ringkas '
+    + '(maksimal sekitar 25 elemen), tanpa tag script, tanpa atribut event (onclick dll), tanpa '
+    + 'foreignObject, tanpa resource eksternal, teks pendek font-family sans-serif minimal ukuran 12. '
+    + 'Palet: latar #ffffff atau #f8fafc, bentuk utama #1f54c9, aksen #dfae3d, garis #d8dde7, teks '
+    + '#223047. Pilih jenis diagram yang paling ngebantu paham isi bagian itu: alur, siklus, '
+    + 'perbandingan, hierarki, atau peta konsep.';
+  function minta(sys, payload, tag){
+    return chatComplete(
+      [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(payload) }],
+      { temperature: 0.3, maxTokens: 12288, model: cfg.chatModel }
+    ).then(function(raw){
+      var d = parseLesson(raw);
+      if (!d) throw new Error('ilustrasi ' + tag + ' nggak ke-parse');
+      return d;
+    });
+  }
   var outline = {
     judul: data.judul || '',
     modul: (data.modul || []).map(function(m, i){
@@ -1838,35 +1871,44 @@ function buatIlustrasi(data){
       return { i: i, judul: s.judul || '', isi: (s.isi || []).join(' ').slice(0, 150) };
     })
   };
-  var sys = 'Kamu ilustrator edukasi yang bikin diagram SVG sederhana. Balas HANYA JSON valid tanpa '
-    + 'penjelasan lain, tanpa markdown, bentuknya: {"hero":string,"modul":[string],"slide":[string]} '
+  var jobs = [];
+  // Chunk 1: hero + diagram modul.
+  jobs.push(minta(
+    'Kamu ilustrator edukasi yang bikin diagram SVG sederhana. Balas HANYA JSON valid tanpa '
+    + 'penjelasan lain, tanpa markdown, bentuknya: {"hero":string,"modul":[string]} '
     + '"hero" satu SVG peta konsep keseluruhan materi. "modul" array SVG yang panjangnya HARUS sama '
-    + 'dengan jumlah bagian modul di bawah, urut sesuai index. "slide" array SVG panjangnya sama '
-    + 'dengan jumlah slide urut index; kalau slide nggak butuh diagram, isi string kosong "". '
-    + 'Aturan tiap SVG: mulai <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 280">, ringkas '
-    + '(maksimal sekitar 25 elemen), tanpa tag script, tanpa atribut event (onclick dll), tanpa '
-    + 'foreignObject, tanpa resource eksternal, teks pendek font-family sans-serif minimal ukuran 12. '
-    + 'Palet: latar #ffffff atau #f8fafc, bentuk utama #1f54c9, aksen #dfae3d, garis #d8dde7, teks '
-    + '#223047. Pilih jenis diagram yang paling ngebantu paham isi bagian itu: alur, siklus, '
-    + 'perbandingan, hierarki, atau peta konsep.';
-  return chatComplete(
-    [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(outline) }],
-    { temperature: 0.3, maxTokens: 16384, model: cfg.chatModel }
-  ).then(function(raw){
-    var d = parseLesson(raw);
-    if (!d) throw new Error('ilustrasi nggak ke-parse');
-    var ill = { hero: safeSvg(d.hero), modul: {}, slide: {} };
+    + 'dengan jumlah bagian modul di bawah, urut sesuai index. ' + rules,
+    { judul: outline.judul, modul: outline.modul }, 'modul'
+  ).then(function(d){
+    ill.hero = safeSvg(d.hero);
     (Array.isArray(d.modul) ? d.modul : []).forEach(function(s, i){
       var v = safeSvg(s); if (v) ill.modul[i] = v;
     });
-    (Array.isArray(d.slide) ? d.slide : []).forEach(function(s, i){
-      var v = safeSvg(s); if (v) ill.slide[i] = v;
+    renderPartial();
+  }).catch(function(){}));
+  // Chunk 2 & 3: diagram slide, dibagi dua biar jalan paralel.
+  var sl = outline.slide;
+  if (sl.length){
+    var mid = Math.ceil(sl.length / 2);
+    [sl.slice(0, mid), sl.slice(mid)].forEach(function(part, pi){
+      if (!part.length) return;
+      jobs.push(minta(
+        'Kamu ilustrator edukasi yang bikin diagram SVG sederhana. Balas HANYA JSON valid tanpa '
+        + 'penjelasan lain, tanpa markdown, bentuknya: {"slide":[string]} \u2014 array SVG panjangnya '
+        + 'HARUS sama dengan jumlah slide di bawah, urut sesuai index; kalau slide nggak butuh '
+        + 'diagram, isi string kosong "". ' + rules,
+        part, 'slide' + (pi + 1)
+      ).then(function(d){
+        (Array.isArray(d.slide) ? d.slide : []).forEach(function(s, k){
+          var v = safeSvg(s);
+          if (v && part[k]) ill.slide[part[k].i] = v;
+        });
+        renderPartial();
+      }).catch(function(){}));
     });
-    return ill;
-  }).catch(function(){
-    // Ilustrasi gagal? Sesi tetap jalan, tinggal pakai visual cadangan.
-    return { hero: '', modul: {}, slide: {} };
-  });
+  }
+  if (!jobs.length) return Promise.resolve(ill);
+  return Promise.all(jobs).then(function(){ return ill; });
 }
 
 function safeSvg(s){
@@ -2254,7 +2296,7 @@ function showWarnPopup(){
   var good = '#34D399', mid = '#fbbf24', bad = '#f87171';
   var sCol = foc.noise < 30 ? good : foc.noise < 60 ? mid : bad;
   $('warn-stats').innerHTML =
-    '<span><span style="color:' + (face ? good : bad) + '">&#9679;</span> Wajah ' + (face ? 'ada' : 'tidak ada') + '</span>' +
+    '<span><span style="color:' + (face ? good : bad) + '">&#9679;</span> Wajah ' + (face ? 'terlihat' : 'tidak terlihat') + '</span>' +
     '<span><span style="color:' + sCol + '">&#9679;</span> Suara ' + (foc.noise < 30 ? 'tenang' : foc.noise < 60 ? 'sedang' : 'berisik') + '</span>' +
     '<span><span style="color:' + (avg > 60 ? good : avg > 30 ? mid : bad) + '">&#9679;</span> Skor ' + avg + '%</span>';
   $('warn-pop').classList.remove('hide');
@@ -2412,7 +2454,7 @@ $('btn-cam').addEventListener('click', function(){
       if (pp && pp.catch) pp.catch(function(){});
       skinPrev = null;
       attachNoiseAnalyser(stream); // mic dari stream detektor → sumber noise
-      setStatus($('face-status'), 'detektor fokus jalan (wajah cek tiap 1,5 dtk + mic).');
+      setStatus($('face-status'), 'detektor fokus jalan (wajah cek tiap 1,5 dtk + mic, kecerahan ngikutin ruangan).');
       // Kalau laptop ditutup/kamera dicabut, track-nya jadi 'ended' atau 'mute' —
       // elemen <video>-nya masih nampilin frame terakhir yang beku, jadi wajib kita tangkep
       // di sini biar nggak dianggap masih fokus. 'ended' = mati beneran (UI balik ke
@@ -2421,6 +2463,12 @@ $('btn-cam').addEventListener('click', function(){
       if (vt){
         vt.addEventListener('ended', cameraDied);
         vt.addEventListener('mute', faceLost);
+        // Ruangan gelap: minta auto-exposure kontinu ke kamera biar kecerahan
+        // ngikutin ruangan; nggak semua track/browser support → diabaikan aja.
+        try{
+          if (vt.applyConstraints)
+            vt.applyConstraints({ advanced: [{ exposureMode: 'continuous' }] }).catch(function(){});
+        }catch(e){}
       }
     })
     .catch(function(){
@@ -2468,6 +2516,21 @@ function setFace(has){
   updateFocusUI();
 }
 var skinCv = null, skinPrev = null;
+// Kecerahan rata-rata frame (luma 0-255, sampling tiap 4 piksel) + gain
+// pencerahan buat ruangan remang: mean < 60 → piksel dikali gain (maks 4×)
+// biar ambang deteksi (r > 80 dll.) tetap bermakna walau kamera nggak sempat
+// auto-expose. Ruangan terang → gain 1 (nggak diubah).
+function lumaMean(d){
+  var s = 0, n = 0, i;
+  for (i = 0; i < d.length; i += 16){
+    s += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    n++;
+  }
+  return s / Math.max(1, n);
+}
+function darkGain(mean){
+  return mean < 60 ? Math.min(4, 70 / Math.max(mean, 8)) : 1;
+}
 // Fallback tanpa FaceDetector — ambang & rumus persis alynne.edu:
 // kulit > 15% di area tengah 40x45 DAN gerak antar-frame nggak heboh
 // (rata selisih piksel < 30; gerak heboh = mungkin lagi mangkal dari kamera).
@@ -2486,12 +2549,16 @@ function skinFaceCheck(v){
       for (i = 0; i < frame.length; i += 16) diffSum += Math.abs(frame[i] - skinPrev[i]);
     }
     skinPrev = new Uint8ClampedArray(frame);
+    // Ruangan remang: piksel gelap → ambang kulit nggak bakal kecapai walau
+    // wajahnya ada. Piksel dinilai pakai gain; perbandingan gerak (diff) tetap
+    // pakai nilai mentah biar nggak salah tangkap gara-gara gain naik-turun.
+    var gain = darkGain(lumaMean(frame));
     var skinPixels = 0;
     var startX = 20, endX = 60, startY = 5, endY = 50;
     for (var y = startY; y < endY; y++){
       for (var x = startX; x < endX; x++){
         var idx = (y * 80 + x) * 4;
-        var r = frame[idx], g = frame[idx + 1], b = frame[idx + 2];
+        var r = Math.min(255, frame[idx] * gain), g = Math.min(255, frame[idx + 1] * gain), b = Math.min(255, frame[idx + 2] * gain);
         if (r > 80 && g > 40 && b > 20 && r > g && r > b && (r - g) > 15 && r < 250) skinPixels++;
       }
     }
@@ -2508,6 +2575,32 @@ function skinFaceCheck(v){
 //   mean  = kecerahan rata-rata (buat bedain "kamar gelap" vs "lensa tertutup")
 var frameCv = null;
 var framePrev = null;
+var detectCv = null;
+// Ambil frame video buat jalur FaceDetector; kalau gelap (mean < 60), terangin
+// pakai gain dulu (deteksi jalan di canvas yang udah dicerahkan) — ruangan
+// normal tetap pakai video mentah, alur alynne.edu nggak berubah.
+function grabDetectFrame(v){
+  try{
+    if (!v.videoWidth) return { mean: 100, cv: null };
+    if (!detectCv) detectCv = document.createElement('canvas');
+    detectCv.width = v.videoWidth; detectCv.height = v.videoHeight;
+    var cx = detectCv.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(v, 0, 0);
+    var im = cx.getImageData(0, 0, detectCv.width, detectCv.height);
+    var d = im.data;
+    var mean = lumaMean(d);
+    if (mean < 60){
+      var gain = darkGain(mean);
+      for (var i = 0; i < d.length; i += 4){
+        d[i] = Math.min(255, d[i] * gain);
+        d[i + 1] = Math.min(255, d[i + 1] * gain);
+        d[i + 2] = Math.min(255, d[i + 2] * gain);
+      }
+      cx.putImageData(im, 0, 0);
+    }
+    return { mean: mean, cv: detectCv };
+  } catch(e){ return { mean: 100, cv: null }; }
+}
 function frameStatus(){
   try{
     var v = $('cam');
@@ -2582,7 +2675,11 @@ function faceCheck(){
   // ── Deteksi wajah gaya alynne.edu: FaceDetector API kalau browser punya,
   // kalau nggak: skin-tone + frame-diff (lihat skinFaceCheck). Tanpa model online.
   if (window.FaceDetector){
-    new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 }).detect(v)
+    // Ruangan gelap → deteksi di frame yang udah diterangin (canvas); normal →
+    // video mentah (persis alynne.edu).
+    var gD = grabDetectFrame(v);
+    var srcDet = (gD.mean < 60 && gD.cv) ? gD.cv : v;
+    new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 }).detect(srcDet)
       .then(function(faces){ setFace(!!(faces && faces.length)); })
       .catch(function(){
         // Deteksi error → jangan pakai nilai lama (bisa nyangkut "wajah kelihatan" selamanya).
@@ -2613,8 +2710,8 @@ function updateFocusUI(){
     var trkOk = !!trk && trk.readyState === 'live' && !trk.muted;
     if (!trkOk) setStatus($('face-status'),
       foc.lastErr || 'kamera berhenti/tertutup — dihitung nggak fokus.', 'err');
-    else if (foc.faceOk === true) setStatus($('face-status'), 'wajah kelihatan.');
-    else if (foc.faceOk === false) setStatus($('face-status'), 'wajah nggak kelihatan.');
+    else if (foc.faceOk === true) setStatus($('face-status'), 'wajah terlihat');
+    else if (foc.faceOk === false) setStatus($('face-status'), 'wajah tidak terlihat');
   }
 }
 
