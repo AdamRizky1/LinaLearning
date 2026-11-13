@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="LinaLearning. Rekam pelajaran atau upload audio, ubah jadi modul baca, slide, dan kuis dengan bantuan AI.">
+<link rel="icon" type="image/png" href="/favicon.png">
 <meta name="theme-color" content="#4f46e5">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Cdefs%3E%3ClinearGradient%20id%3D%27g%27%20x1%3D%270%27%20y1%3D%270%27%20x2%3D%271%27%20y2%3D%271%27%3E%3Cstop%20offset%3D%270%27%20stop-color%3D%27%234f46e5%27%2F%3E%3Cstop%20offset%3D%27.5%27%20stop-color%3D%27%237c3aed%27%2F%3E%3Cstop%20offset%3D%271%27%20stop-color%3D%27%232563eb%27%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%2764%27%20height%3D%2764%27%20rx%3D%2716%27%20fill%3D%27url%28%23g%29%27%2F%3E%3Cpath%20d%3D%27M20%2014h11v25h14v11H20z%27%20fill%3D%27%23ffffff%27%2F%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -82,15 +83,32 @@ body.guest #topnav-guest{display:flex}
 .topnav-glink.gs{color:var(--accent-ink);background:var(--accent);font-weight:600;margin-left:6px}
 .topnav-glink.gs:hover{background:var(--accent-dk);color:var(--accent-ink)}
 .landing{max-width:1080px;margin:0 auto;padding:0 20px}
-.land-hero{display:grid;grid-template-columns:1.05fr .95fr;gap:30px;align-items:center;padding:54px 0 36px}
-.land-hero h2{font-size:33px;line-height:1.16;letter-spacing:-.02em;margin:0 0 14px;color:var(--ink)}
-.land-hero p{color:var(--muted);font-size:15.5px;line-height:1.65;margin:0 0 22px}
+.land-hero{padding:52px 0 8px;text-align:center}
+.land-hero h2{font-size:33px;line-height:1.16;letter-spacing:-.02em;margin:0 auto 12px;color:var(--ink);max-width:820px}
+.land-hero p{color:var(--muted);font-size:15.5px;line-height:1.65;margin:0 auto 20px;max-width:660px}
+.stage3d-wrap{max-width:980px;margin:14px auto 0}
+.stage3d{position:relative;height:352px;perspective:1500px;perspective-origin:50% 45%}
+.ring3d{position:absolute;inset:0;transform-style:preserve-3d;
+  transition:transform .85s cubic-bezier(.22,.8,.26,1)}
+.slide3d{position:absolute;top:12px;left:50%;width:520px;height:325px;margin-left:-260px;
+  border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--panel);
+  box-shadow:0 18px 44px rgba(17,24,39,.26);
+  backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.slide3d img{width:100%;height:100%;object-fit:cover;display:block}
+.s3d-ctrl{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 34px}
+.s3d-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--panel);
+  color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.s3d-btn:hover{border-color:var(--accent);color:var(--accent)}
+.dots3d{display:flex;gap:7px}
+.dot3d{width:8px;height:8px;border-radius:5px;border:none;padding:0;background:var(--muted-2);
+  cursor:pointer;transition:.25s}
+.dot3d.on{background:var(--accent);width:24px}
+.land-sec{padding:44px 0;border-top:1px solid var(--line)}
+#screen-about .land-sec{border-top:none;padding-top:38px}
+#screen-about .land-sec .lead{max-width:720px}
 .land-cta{display:inline-block;background:var(--accent);color:var(--accent-ink);font-weight:600;
   font-size:14.5px;padding:12px 22px;border-radius:var(--r-btn);border:none;cursor:pointer;font-family:inherit}
 .land-cta:hover{background:var(--accent-dk)}
-.land-shot{width:100%;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg);display:block}
-.land-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:4px 0 48px}
-.land-strip img{width:100%;border:1px solid var(--line);border-radius:10px;display:block}
 .land-sec{padding:44px 0;border-top:1px solid var(--line)}
 .land-sec h2{font-size:22px;margin:0 0 6px;color:var(--ink)}
 .land-sec .lead{color:var(--muted);margin:0 0 26px;font-size:14.5px}
@@ -99,8 +117,9 @@ body.guest #topnav-guest{display:flex}
 .feat h3{margin:0 0 8px;font-size:15px;color:var(--ink)}
 .feat p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.6}
 @media (max-width:800px){
-  .land-hero{grid-template-columns:1fr;padding-top:32px}
-  .feat-grid, .land-strip{grid-template-columns:1fr}
+  .feat-grid{grid-template-columns:1fr}
+  .stage3d{height:288px}
+  .slide3d{width:380px;height:238px;margin-left:-190px;top:22px}
 }
 .back-land{display:inline-block;margin-bottom:10px;color:var(--muted);font-size:13px;
   text-decoration:none}
@@ -509,21 +528,38 @@ select{font:inherit;color:inherit}
 <section id="screen-landing" class="hide">
   <div class="landing" id="dash">
     <div class="land-hero">
-      <div>
-        <h2>Belajar dari rekaman suara, jadi modul, slide, dan kuis dalam beberapa menit.</h2>
-        <p>Rekam penjelasan materimu langsung dari browser, atau upload audio yang udah ada.
-        LinaLearning merangkum isinya jadi modul, slide, kuis, dan peta materi, terus ngawasin
-        fokusmu selama sesi belajar berjalan.</p>
-        <button class="land-cta" id="land-cta" type="button">Get Started</button>
+      <h2>Belajar dari rekaman suara, jadi modul, slide, dan kuis dalam beberapa menit.</h2>
+      <p>Rekam penjelasan materimu langsung dari browser, atau upload audio yang udah ada.
+      LinaLearning merangkum isinya jadi modul, slide, kuis, dan peta materi, terus ngawasin
+      fokusmu selama sesi belajar berjalan.</p>
+      <button class="land-cta" id="land-cta" type="button">Get Started</button>
+      <div class="stage3d-wrap">
+        <div class="stage3d" id="stage3d">
+          <div class="ring3d" id="ring3d">
+            <div class="slide3d"><img src="img/shot-home.jpg" alt="Beranda LinaLearning"></div>
+            <div class="slide3d"><img src="img/shot-modul.jpg" alt="Modul belajar otomatis"></div>
+            <div class="slide3d"><img src="img/shot-slide.jpg" alt="Slide pelajaran berdiagram"></div>
+            <div class="slide3d"><img src="img/shot-focus.jpg" alt="Pengawas fokus selama sesi belajar"></div>
+            <div class="slide3d"><img src="img/shot-report.jpg" alt="Laporan akhir belajar"></div>
+          </div>
+        </div>
+        <div class="s3d-ctrl">
+          <button class="s3d-btn" id="s3d-prev" type="button" aria-label="Screenshot sebelumnya"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <div class="dots3d" id="dots3d"></div>
+          <button class="s3d-btn" id="s3d-next" type="button" aria-label="Screenshot berikutnya"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
       </div>
-      <img class="land-shot" src="img/shot-home.jpg" alt="Tampilan beranda LinaLearning">
     </div>
-    <div class="land-strip">
-      <img src="img/shot-modul.jpg" alt="Modul belajar yang dirangkum otomatis">
-      <img src="img/shot-slide.jpg" alt="Slide pelajaran dengan diagram">
-      <img src="img/shot-focus.jpg" alt="Pengawas fokus selama sesi belajar">
+    <div class="land-sec" id="get-started">
+      <h2>Siap mulai?</h2>
+      <p class="lead">Bikin akun gratis, masuk, terus langsung rekam atau upload materi pertamamu.</p>
+      <button class="land-cta" id="land-cta-2" type="button">Get Started</button>
     </div>
-    <div class="land-sec" id="about">
+  </div>
+</section>
+<section id="screen-about" class="hide">
+  <div class="landing" id="about">
+    <div class="land-sec">
       <h2>Fiturnya apa aja, dan gunanya buat apa</h2>
       <p class="lead">Semuanya jalan di satu halaman, tanpa install, dan prosesnya cepat karena
       langsung dikerjain saat kamu mulai belajar.</p>
@@ -565,11 +601,7 @@ select{font:inherit;color:inherit}
           ngawas langsung.</p>
         </div>
       </div>
-    </div>
-    <div class="land-sec" id="get-started">
-      <h2>Siap mulai?</h2>
-      <p class="lead">Bikin akun gratis, masuk, terus langsung rekam atau upload materi pertamamu.</p>
-      <button class="land-cta" id="land-cta-2" type="button">Get Started</button>
+      <p style="margin:24px 0 0"><button class="land-cta" id="land-cta-3" type="button">Get Started</button></p>
     </div>
   </div>
 </section>
@@ -896,13 +928,13 @@ function esc(s){
 }
 function updateNav(id){
   document.body.classList.toggle('nav-off', id === 'screen-login');
-  document.body.classList.toggle('guest', id === 'screen-landing');
-  var onHome = id === 'screen-home' || id === 'screen-login' || id === 'screen-landing';
+  document.body.classList.toggle('guest', id === 'screen-landing' || id === 'screen-about');
+  var onHome = id === 'screen-home' || id === 'screen-login' || id === 'screen-landing' || id === 'screen-about';
   $('nav-beranda').classList.toggle('on', onHome);
   $('nav-study').classList.toggle('on', id === 'screen-study');
 }
 function show(id){
-  ['screen-landing','screen-login','screen-home','screen-study','screen-report'].forEach(function(s){
+  ['screen-landing','screen-about','screen-login','screen-home','screen-study','screen-report'].forEach(function(s){
     $(s).classList.toggle('hide', s !== id);
   });
   updateNav(id);
@@ -1011,7 +1043,7 @@ $('gnav-dash').addEventListener('click', function(e){
 });
 $('gnav-about').addEventListener('click', function(e){
   e.preventDefault();
-  $('about').scrollIntoView({ behavior: 'smooth' });
+  show('screen-about'); // halaman about sendiri, bukan cuma scroll
 });
 $('gnav-getstarted').addEventListener('click', function(){
   show('screen-login');
@@ -1022,10 +1054,50 @@ $('land-cta').addEventListener('click', function(){
 $('land-cta-2').addEventListener('click', function(){
   show('screen-login');
 });
+$('land-cta-3').addEventListener('click', function(){
+  show('screen-login');
+});
 $('lnk-back-landing').addEventListener('click', function(e){
   e.preventDefault();
   show('screen-landing');
 });
+
+// Slideshow 3D (korsel) buat screenshot landing: ring di-sumbu Y, kartu depan
+// tegak lurus, kartu samping miring, yang di belakang tersembunyi (backface).
+// Auto muter, berhenti pas kursor di atasnya, panah + titik buat pindah manual.
+var s3dCards = document.querySelectorAll('.slide3d');
+var s3dN = s3dCards.length;
+if (s3dN){
+  var s3dIdx = 0, s3dTimer = null, s3dDots = $('dots3d');
+  for (var i = 0; i < s3dN; i++){
+    var s3dD = document.createElement('button');
+    s3dD.className = 'dot3d'; s3dD.type = 'button';
+    s3dD.setAttribute('aria-label', 'Tampilan ke-' + (i + 1));
+    (function(n){ s3dD.addEventListener('click', function(){ s3dSet(n); s3dAuto(); }); })(i);
+    s3dDots.appendChild(s3dD);
+  }
+  function s3dSet(i){
+    s3dIdx = ((i % s3dN) + s3dN) % s3dN;
+    // Radius dihitung dari lebar kartu asli → tetap benar pas layout mengecil.
+    var s3dR = Math.round((s3dCards[0].offsetWidth || 520) / 2 / Math.tan(Math.PI / s3dN));
+    $('ring3d').style.transform = 'translateZ(' + (-s3dR) + 'px) rotateY(' + (-s3dIdx * 360 / s3dN) + 'deg)';
+    for (var k = 0; k < s3dN; k++){
+      s3dCards[k].style.transform = 'rotateY(' + (k * 360 / s3dN) + 'deg) translateZ(' + s3dR + 'px)';
+      s3dDots.children[k].classList.toggle('on', k === s3dIdx);
+    }
+  }
+  function s3dAuto(){
+    if (s3dTimer) clearInterval(s3dTimer);
+    s3dTimer = setInterval(function(){ s3dSet(s3dIdx + 1); }, 3400);
+  }
+  $('s3d-prev').addEventListener('click', function(){ s3dSet(s3dIdx - 1); s3dAuto(); });
+  $('s3d-next').addEventListener('click', function(){ s3dSet(s3dIdx + 1); s3dAuto(); });
+  $('stage3d').addEventListener('mouseenter', function(){ if (s3dTimer) clearInterval(s3dTimer); s3dTimer = null; });
+  $('stage3d').addEventListener('mouseleave', s3dAuto);
+  window.addEventListener('resize', function(){ s3dSet(s3dIdx); });
+  s3dSet(0);
+  s3dAuto();
+}
 
 // ===== Navbar: Beranda / Mode belajar =====
 $('nav-beranda').addEventListener('click', function(e){
@@ -2798,32 +2870,16 @@ function faceCheck(){
   // ambang "hidup" dilonggarkan biar kamar gelap nggak salah dilapor kamera beku.
   // Lensa tertutup beneran vonisnya mean < 10 DAN std < 2 (hitam nyaris rata).
   var dark = fs.ready && fs.mean < 60;
-  // Cek pertama (belum ada pembanding) pakai variasi dalam frame; cek berikutnya
-  // pakai perubahan antar frame — kamera hidup SELALU punya noise/mikro-gerak
-  // (nilainya > 0), frame beku pas 0. Ini penangkal anti-cheat sekaligus
-  // anti "kamar gelap salah dilapor mati".
-  var frameOk = trackOk && fs.ready &&
-    (fs.first ? fs.std > 2.5
-              : (fs.moved > (dark ? 0.004 : 0.02) || (fs.std > 2.5 && fs.moved > 0.002)));
-  // 3) Debounce: satu cek jelek (frame gelap sesaat, exposure lagi naik, dll.) bukan
-  //    berarti mati — wajib gagal 2x berturut-turut (±8 detik) baru dinyatakan bermasalah.
-  if (!trackOk || !frameOk){
-    foc.deadStreak++;
-    if (foc.deadStreak >= 2){
-      // Vonisnya JUJUR per penyebab — biar pengguna nggak dikira-kira "kamera mati"
-      // padahal kamar gelap, lensa ketutup, atau kamera lagi dipakai app lain.
-      if (!trackOk) faceLost('kamera berhenti/terputus, sementara dihitung nggak fokus.');
-      else if (fs.ready && fs.mean < 10 && fs.std < 2)
-        faceLost('frame kamera item, lensa bisa ketutup atau kamera lagi dipakai aplikasi lain. Sementara dihitung nggak fokus.');
-      else if (fs.ready && fs.moved < (dark ? 0.004 : 0.02))
-        faceLost('frame kamera beku (nggak berubah-ubah), matikan lalu nyalakan lagi kameranya. Sementara dihitung nggak fokus.');
-      else
-        faceLost();
-    }
-    return;
-  }
-  foc.deadStreak = 0;
-  foc.lastErr = null;
+  // Wajah ketemu = bukti kuat frame valid (lensa ketutup/item nggak mungkin
+  // nampilin wajah), jadi vonis beku/item cuma dipertimbangkan kalau wajah
+  // NGGAK ketemu. Pengguna duduk diam membaca → frame nyaris identik → dulu
+  // salah dilapor "kamera beku" dan poin wajahnya dibuang (skor anjlok
+  // padahal status "wajah terlihat"). Sekarang: diam = fokus, bukan gangguan.
+  // Cek pertama juga dilonggarkan: serahkan ke deteksi wajah, jangan vonis
+  // sebelum ada pembanding.
+  var weak = !trackOk || (fs.ready &&
+    !(fs.first || fs.moved > (dark ? 0.004 : 0.02) || (fs.std > 2.5 && fs.moved > 0.002)));
+  if (!trackOk){ faceMiss(true, fs, dark); return; }
   // Preview ikut diterangin biar pengguna tetap lihat wajahnya di kamar gelap.
   // CSS filter cuma penampilan; frame yang dibaca detektor tetap mentah (canvas
   // yang dikasih gain sendiri), jadi pencerahannya nggak dobel.
@@ -2836,14 +2892,36 @@ function faceCheck(){
     var gD = grabDetectFrame(v);
     var srcDet = (gD.mean < 60 && gD.cv) ? gD.cv : v;
     new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 }).detect(srcDet)
-      .then(function(faces){ setFace(!!(faces && faces.length)); })
+      .then(function(faces){
+        if (faces && faces.length){ foc.deadStreak = 0; foc.lastErr = null; setFace(true); }
+        else faceMiss(weak, fs, dark);
+      })
       .catch(function(){
         // Deteksi error → jangan pakai nilai lama (bisa nyangkut "wajah kelihatan" selamanya).
         faceLost();
       });
   } else {
-    setFace(skinFaceCheck(v));
+    if (skinFaceCheck(v)){ foc.deadStreak = 0; foc.lastErr = null; setFace(true); }
+    else faceMiss(weak, fs, dark);
   }
+}
+// Wajah nggak ketemu. Frame valid → cukup "wajah tidak terlihat" (gangguan
+// biasa, pesan error nggak perlu). Frame syak (beku/item/track mati) → jalur
+// anti-cheat: wajib 2x berturut-turut baru dinyatakan bermasalah, vonisnya
+// JUJUR per penyebab biar pengguna nggak dikira-kira "kamera mati" padahal
+// kamar gelap atau lensa ketutup.
+function faceMiss(weak, fs, dark){
+  setFace(false);
+  if (!weak) return;
+  foc.deadStreak++;
+  if (foc.deadStreak < 2) return;
+  if (!fs || !fs.ready){ faceLost(); return; }
+  if (fs.mean < 10 && fs.std < 2)
+    faceLost('frame kamera item, lensa bisa ketutup atau kamera lagi dipakai aplikasi lain. Sementara dihitung nggak fokus.');
+  else if (!fs.first && fs.moved < (dark ? 0.004 : 0.02))
+    faceLost('frame kamera beku (nggak berubah-ubah), matikan lalu nyalakan lagi kameranya. Sementara dihitung nggak fokus.');
+  else
+    faceLost();
 }
 function updateFocusUI(){
   if (!session) return;
