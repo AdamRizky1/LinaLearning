@@ -1,80 +1,144 @@
 # Catatan desain
 
-Arah desain: **modern AI product dengan rasa NotebookLM** — source-centric,
-kurikulum jelas, warna merek tetap indigo–violet. Aturannya:
+Arah desain: **web produk yang bersih dan tenang** — satu warna aksen,
+kertas netral, tipografi tunggal, tanpa hiasan "template AI" (gradient
+berlebih, glow, pill ber-glow, font display terpisah). Lapisan visual ini
+diterapkan di atas fungsionalitas inti milik repo (login/akun, mesin fokus
+ala alynne.edu, auto-send laporan MailKite, penyimpanan Turso) tanpa
+mengubahnya — lihat bagian "Fitur inti yang dipertahankan".
 
-- Latar terang #f7f8fc dengan **aura aurora** halus di atas halaman (radial
-  gradient indigo–violet–biru, opacity rendah, fixed). Panel putih #ffffff,
-  teks #0e1526.
-- Satu warna merek: indigo #4f46e5, plus **gradient merek**
-  `linear-gradient(120deg, #4f46e5, #7c3aed, #2563eb)` yang dipakai konsisten:
-  logo kotak, tombol utama, nomor step, bar atas slide & laporan, dot chip,
-  root peta materi, progress bar jalur. Hijau #0e9f6e jawaban benar; merah
-  #e5484d salah/bahaya; amber buat analogi & peringatan.
-- Tipografi dua peran via Google Fonts: **Space Grotesk** (display: wordmark,
-  hero, heading, angka statistik, root peta) dan **Inter** (body). Fallback
-  sistem kalau font gagal load.
+## Token & visual
 
-Struktur ala NotebookLM:
+- Latar netral `#fafafb`, panel putih `#ffffff`, teks utama `#111827`,
+  sekunder `#6b7280`. **Satu warna aksen**: indigo `#4f46e5` (dengan
+  `--accent-dk` untuk hover). Tidak ada gradient merek, tidak ada glow/
+  aura di atas hero. Status pakai tiga warna lembut: hijau `#059669`
+  (sukses/jawaban benar/fokus bagus), amber `#b45309` (menunggu/
+  peringatan), merah `#dc2626` (error/salah).
+- Kartu putih, border tipis `#e7e7ec`, shadow sangat tipis (`--shadow-sm`).
+  Radius konsisten per peran: kartu `12px`, tombol `8px`, pill/chip
+  `999px`. Spacing kelipatan 8px.
+- Tombol utama: solid indigo, radius 8px, `min-height:40px` (bukan pill
+  ber-glow). Tombol kedua: putih border tipis, hover ke aksen. State
+  hover/focus/disabled jelas.
+- Tipografi **satu font: Inter** (Google Fonts, 400/500/600/700). Hierarki
+  empat level: judul (section ~20px), subjudul (16px), body (15.5px),
+  caption (13px). Label uppercase pakai `--muted` (kontras lolos WCAG AA,
+  bukan pudar).
 
-- **Label seksi kecil uppercase** di atas tiap kartu home: "Sumber · Audio",
-  "Sumber · Materi tulisan", "Studio · Transkrip", "Studio · Susun output" —
-  menata alur sumber → output tanpa mengubah langkah lama.
-- **Chip sumber** di kartu studio: pill kecil ber-dot gradient yang menunjukkan
-  sumber terkumpul (Audio + nama file, Transkrip + jumlah kata, Materi tempel,
-  File materi). Terisi otomatis dari updateGenReady.
-- **Jalur belajar (kurikulum)** di layar belajar, muncul sebelum fokus strip:
-  kartu tahapan horizontal (3-6 tahap dari model via kolom `kurikulum` JSON,
-  fallback disusun lokal dari modul, tahap "Uji pemahaman" selalu nempel di
-  ujung). Tiap tahap punya dot status (todo/current/done), estimasi menit, dan
-  bisa diklik → lompat ke bagian modul terkait atau tab kuis. Progress bar
-  gradient + catatan "x dari y tahap selesai". Tahap jadi done saat diklik;
-  tahap kuis done otomatis saat kuis kelar.
-- **Peta materi (mind map)**: tab keempat "Peta" di layar belajar. Tree CSS
-  dengan konektor garis (ul/li ::before/::after): root gradient (judul +
-  label "peta materi"), cabang per modul (chip jumlah poin, klik → lompat ke
-  bagiannya), daun = poin penting (maks 4 per cabang), plus node kuis.
-- **Navbar atas ala produk notebook**: di topbar ada dua link pill — "Beranda"
-  dan "Mode belajar" — dengan state aktif (pill indigo lembut). Di layar setup
-  navbar disembunyiin (body.nav-off), di layar sempit wordmark teks dimatiin
-  biar muat. Klik "Mode belajar" langsung lompat ke layar belajar (sesi lama
-  di-resume, nggak regenerate); kalau sumbernya kosong, dibalikin ke beranda
-  dengan pesan arahan.
-- **Pipeline auto-generate di layar belajar**: begitu masuk mode belajar
-  (nav "Mode belajar" atau tombol "Mulai belajar"), muncul strip progres dengan
-  4 chip status — Modul / Slide / Peta / Kuis — tiap chip berubah antre →
-  jalan (dot indigo berdenyut) → done (hijau) → dilewati (redup, kalau user
-  nggak milih) → error (merah). Selagi nyusun, pane diisi skeleton shimmer.
-  Ilustrasi digambar belakangan, pane di-render ulang begitu dateng.
-- **Pilihan bahan per-user**: chip toggle "Dibuat otomatis" di langkah 4
-  beranda (Modul, Slide, Peta materi, Kuis; tersimpan di localStorage
-  `lina_gensel`). Yang nggak dipilih nggak dipanggil ke API sama sekali —
-  prompt modul disusun dinamis sesuai pilihan — dan panenya nampilin pesan
-  ramah, bukan "Nggak ada slide." polos.
-- Prompt modul sekarang minta kolom `kurikulum` (3-6 tahap dasar→penerapan,
-  tanpa kuis) — kalau model nggak kasih, frontend menyusun sendiri dari
-  struktur modul, jadi fitur nggak pernah mati.
+## Halaman masuk
 
-Lanjutan yang sama seperti sebelumnya:
+- Hero sederhana: brand kotak + judul "Rekam pelajaran, jadi modul, slide
+  & kuis" + sub. **Lencana "Dibantu AI" dihapus** dari hero (cukup judul).
+- Kartu masuk berisi tab Masuk/Daftar, form username+password (dan
+  nama+email ortu saat daftar), pesan status. Context aman (localhost/
+  https) tetap diperingatkan.
+- Logika autentikasi (scrypt, session cookie httpOnly via `/api/auth`,
+  penyimpanan akun Turso) tidak diubah — hanya kulit visualnya.
 
-- Hero di layar pertama: logo gradient besar, pill "Dibantu AI", headline
-  ber-gradient teks, sub-lead, kartu form melayang; beranda buka dengan hero
-  sapaan per-user.
-- Tombol: utama gradient pill (radius 999px) shadow glow; kedua pill putih;
-  pilih file pill lembut (.filebtn) dengan input visually-hidden.
-- Kartu putih radius 16-18px, border 1px #e3e7f1, bayangan halus, konsisten.
-- App shell: topbar sticky blur; footer identitas owner jelas ("© 2026 ·
-  Dibuat & dimiliki oleh AdamRizky1") — identitas owner TIDAK boleh diganti.
-- Komponen khas: tab segmented control (kini 4: Modul/Slide/Kuis/Peta), tile
-  statistik fokus, slide kartu presentasi bar gradient, tabel laporan.
-- Meta lengkap: title deskriptif, meta description, theme-color #4f46e5,
-  favicon SVG gradient huruf L.
+## Beranda
+
+- **Stepper tipis** di atas: Sumber → Proses → Belajar (dot state
+  todo/active/done), sinkron otomatis dengan layar aktif. Nomor 1-2-3-4
+  di kartu dihilangkan.
+- **Dropzone besar** sebagai fokus tunggal: "Tarik file audio ke sini,
+  atau rekam suara" + dua aksi jelas **Rekam** dan **Upload**. Tombol
+  "Mulai rekam" baru muncul setelah Rekam dipilih. Drag-and-drop audio
+  ke dropzone (file diteruskan ke input audio yang sudah ada).
+- **Materi tambahan** di-collapse: link "+ Tambah materi (opsional)"
+  yang bisa di-expand (textarea + tombol file). Hasil upload docx/pdf/
+  rtf tetap digabung ke textarea materi sesuai perilaku bawaan (tidak
+  diubah menjadi file-chip terpisah — pilihan safety agar tidak menyentuh
+  alur baca file owner).
+- Alur transkrip → susun tetap dua langkah sesuai bawaan: tombol
+  "Mulai transkrip" tetap tampil (tidak disembunyikan/digabung), dan
+  tombol utama "Mulai belajar" aktif setelah transkrip atau materi ada.
+  Pilihan bahan (Modul/Slide/Peta/Kuis) sebagai chip yang bisa di-toggle.
+- **Sesi sebelumnya** jadi list rapi: judul, tanggal, skor (fokus + kuis),
+  tombol "Buka" (memuat ulang laporan sesi itu via `showReport`). Empty
+  state kalau belum ada sesi.
+
+## Mode belajar
+
+- Konten (Modul/Slide/Kuis/Peta) jadi bintang utama, lebar baca maksimal
+  ~720px.
+- **Panel fokus collapsible**: summary "Fokus sesi 75%" selalu kelihatan,
+  body (kamera + sensitivitas + statistik) bisa di-collapse dan **otomatis
+  terbuka** saat masuk mode belajar. Penjelasan fokus panjang dipindah ke
+  dalam body (hanya kelihatan kalau di-expand).
+- **Selector sensitivitas** (Tinggi/Sedang/Rendah) tetap di panel fokus,
+  nilai tersimpan di `lina-focus-sens` sesuai bawaan.
+- **Tab ber-status**: tiap tab Modul/Slide/Kuis/Peta punya indikator
+  kecil — spinner saat sedang disusun, centang hijau saat siap (di-mirror
+  dari status pipeline).
+- **Statistik fokus pakai konteks**: tile diwarnai lembut (hijau/amber/
+  merah) + label kata "Fokus bagus"/"Lumayan"/"Banyak gangguan" +
+  ringkasan angka di summary, bukan angka mentah doang. Skor dihitung
+  mesin fokus bawaan (wajah 60 + ketenangan mic 40, rata-rata 20 sampel).
+- **Smart warning fokus** tetap: rata-rata skor < 35 yang bertahan
+  beberapa detik memunculkan popup kontekstual (wajah/suara/skor) +
+  cooldown 30 dtk, kecepatannya ikut sensitivitas.
+- Tombol **"Selesai belajar" jadi secondary** (bukan primary) + dialog
+  konfirmasi sebelum sesi diakhiri (anti kepencet nggak sengaja).
+- Pipeline progres tahap (Modul/Slide/Peta/Kuis chip status run→done)
+  tetap, muncul hanya selama generate lalu sembunyi.
+
+## Laporan
+
+- Kartu laporan + tabel ringkasan + transkrip collapsible. Pengiriman
+  **otomatis via MailKite** saat sesi selesai tetap (tombol kirim manual
+  tidak ditambahkan — sesuai arah owner). Pesan status auto-send
+  ditampilkan.
+
+## Navbar & shell
+
+- Navbar: logo kotak + 2 menu (Beranda/Mode belajar) + **avatar akun**
+  di kanan. "nama + ortu: email" dipindah ke **popover profil** (klik
+  avatar), bukan ditampilkan menetap di topbar. Avatar menampilkan huruf
+  depan nama siswa. Wordmark disembunyikan di layar sempit.
+- Footer disederhanakan: brand + tagline + © 2026 · AdamRizky1.
+- Animasi halus 150-200ms, tidak ada yang berlebihan.
+- Responsif HP: satu kolom, padding/tile dikecilkan, dropzone & stepper
+  tetap nyaman dipakai dari layar kecil.
+- **Dark mode** opsional via `prefers-color-scheme: dark` (token
+  di-override: latar gelap `#0f1117`, panel gelap, teks terang).
+
+## Fitur inti yang dipertahankan (tidak diubah)
+
+Lapisan visual ini sengaja tidak menyentuh logika berikut — semuanya tetap
+berjalan persis seperti commit owner terbaru:
+
+- **Login & akun siswa**: halaman masuk/daftar, scrypt + session cookie
+  httpOnly, penyimpanan ke DB Turso (`users`/`sessions`/`laporan`) via
+  `/api/auth` + `/api/laporan`.
+- **Mesin fokus ala alynne.edu**: skor = wajah (60) + ketenangan mic
+  (40 − noise×0.4), `requestAnimationFrame` + rata-rata 20 sampel, cek
+  wajah tiap 1,5 dtk via FaceDetector API/fallback skin-tone (tanpa model
+  online). Tab disembunyikan = sampel 0. Satu `getUserMedia` sebagai
+  gerbang: tanpa kamera nyala, tidak ada sampel dan angka fokus tidak
+  muncul.
+- **Smart warning + sensitivitas**: rata-rata < 35 bertahan
+  ≥ max(3, round((50−sens)/3)) dtk → popup kontekstual + cooldown 30 dtk,
+  pulih → reset. Sensitivitas 20/35/50 tersimpan di `lina-focus-sens`.
+- **Routing 2 model** (modul/slide → glm, kuis → luna) + retry 3x per
+  model + fallback saling back-up + pesan 503 jelas.
+- **Laporan auto-send MailKite** saat sesi selesai, gagal diulang 3x.
+- **Pipeline auto-generate**: lompat ke study langsung menyusun modul,
+  slide, peta, kuis dengan chip progres + pilihan bahan per-user.
+- **Kurikulum & peta materi ala NotebookLM**: jalur belajar bertahap +
+  mind map tab Peta + chip sumber.
+
+## Yang tetap dijaga
+
+- Tidak ada emoji, tidak ada glassmorphism berlebihan, bahasa santai
+  tapi copy profesional.
 - Semua kontrol bisa diakses keyboard (focus-visible), tab role
-  tablist/tab/tabpanel, status role=status, tombol file pola
-  visually-hidden input.
-- Responsif satu kolom; di layar sempit hero & kartu dipadatkan, tahap jalur
-  jadi tumpukan satu kolom, target sentuh dijaga.
-- Yang TETAP dijaga: nggak ada emoji, nggak ada glassmorphism berlebihan,
-  bahasa santai tapi copy profesional, dan semua ID yang dipakai JS nggak
-  diubah supaya fungsi & uji otomatis tetap lolos (test_rekam 23 asersi,
-  test_kurikulum 24 asersi, test_nav_pipeline 33 asersi).
+  tablist/tab/tabpanel, status role=status.
+- **Semua element ID yang dipakai JS tidak diubah** — fungsi rekam, ASR,
+  generate, fokus, laporan, autentikasi tetap berjalan. Perubahan JS
+  hanya empat titik bedah (`btn-finish`→konfirmasi, `renderHistory`→list,
+  `updateFocusUI`→konteks tile, `resetHome` who→format avatar) plus satu
+  blok additive untuk interaksi visual (popover, collapsible, dropzone,
+  stepper sync, tab-status mirror) yang membungkus `show()` dan `pipeSet()`
+  tanpa menimpa logika asli.
+- Identitas owner AdamRizky1 tetap di footer.
