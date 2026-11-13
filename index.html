@@ -609,6 +609,14 @@ body.nav-off .topnav{display:none}
     </div>
     <div style="min-width:200px">
       <button class="btn2" id="btn-cam" type="button">Nyalakan kamera</button>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+        <label class="lbl" for="fokus-sens" style="margin:0">Sensitivitas</label>
+        <select id="fokus-sens" style="flex:1;font:inherit;font-size:12.5px;padding:4px 8px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:inherit">
+          <option value="50">Tinggi (cepat, ~3 dtk)</option>
+          <option value="35">Sedang (~5 dtk)</option>
+          <option value="20">Rendah (lambat, ~10 dtk)</option>
+        </select>
+      </div>
       <p class="status" id="face-status">deteksi wajah: kamera mati</p>
     </div>
     <div class="statsrow" style="margin-left:auto">
@@ -620,8 +628,20 @@ body.nav-off .topnav{display:none}
   <p class="note" style="margin-top:8px">Skor fokus cuma dihitung pas detektornya jalan (kamera nyala):
     wajah kelihatan bernilai 60, ketenangan mic bernilai sampai 40 (skor 0&ndash;100, rata-rata
     20 sampel terakhir). Wajah dicek tiap 1,5 detik langsung oleh browser tanpa model online.
-    Pindah tab atau wajah ilang dihitung gangguan. Kamera nggak dinyalain = detektor nggak jalan
+    Pindah tab atau wajah ilang dihitung gangguan. Rata-rata skor di bawah 35 yang bertahan
+    beberapa detik nge-munculin peringatan (kecepatannya ikut &ldquo;Sensitivitas&rdquo;, tersimpan
+    di browser ini). Kamera nggak dinyalain = detektor nggak jalan
     = skor nggak dihitung (tampil &ndash;), persis sistem fokus di alynne.</p>
+
+  <div class="overlay hide" id="warn-pop" style="align-items:center">
+    <div class="panel" style="max-width:420px;text-align:center;border-color:rgba(251,191,36,.45)">
+      <div style="font-size:34px;line-height:1;margin-bottom:10px">&#9888;&#65039;</div>
+      <h2 id="warn-title" style="margin:0 0 6px;font-size:19px"></h2>
+      <p class="note" id="warn-desc" style="margin:0 0 12px"></p>
+      <p class="status" id="warn-stats" style="text-align:center;margin-bottom:14px"></p>
+      <button class="btn2" id="warn-ok" type="button" style="width:100%">Oke, aku fokus lagi</button>
+    </div>
+  </div>
 
   <div class="tabs" role="tablist" aria-label="Bahan belajar">
     <button role="tab" id="tab-modul" aria-selected="true" type="button">Modul</button>
@@ -2149,6 +2169,56 @@ var foc = { camOn: false, stream: null, faceOk: null, prevFace: null, anim: null
 var camReqTok = 0; // penanda permintaan getUserMedia biar klik ganda nggak bocorkan stream
 var FACE_CHECK_MS = 1500; // frekuensi cek wajah — persis alynne.edu
 
+// ── Sensitivitas + smart warning (alynne.edu): studyFocusSensitivity 0-100
+// (default 0.5 → 50); threshold detik = max(3, round((50 - sens)/3)) →
+// 50 ≈ 3 dtk, 35 ≈ 5 dtk, 20 ≈ 10 dtk. Distracted = rata-rata jendela 20
+// sampel < 35; bertahan ≥ threshold → popup peringatan; antar-popup
+// dikunci 30 dtk (biar nggak spam); fokus pulih → tracking di-reset.
+function fokusSens(){
+  var v = parseInt(localStorage.getItem('lina-focus-sens') || '50', 10);
+  return (v === 20 || v === 35 || v === 50) ? v : 50;
+}
+function distractionThresholdSec(){ return Math.max(3, Math.round((50 - fokusSens()) / 3)); }
+var warn = { start: 0, cooldown: 0 };
+function hideWarn(){ var p = $('warn-pop'); if (p) p.classList.add('hide'); }
+function warnReset(){ warn.start = 0; warn.cooldown = 0; hideWarn(); }
+(function initSens(){
+  var sel = $('fokus-sens');
+  if (!sel) return;
+  sel.value = String(fokusSens());
+  sel.addEventListener('change', function(){
+    try{ localStorage.setItem('lina-focus-sens', sel.value); }catch(e){}
+  });
+})();
+
+// Popup peringatan — pesan kontekstual persis DistractedPopup alynne.edu:
+// wajah ilang + hening, wajah ilang aja, suara berisik, atau semangat umum;
+// plus status wajah/suara/skor kayak di popup aslinya.
+function showWarnPopup(){
+  var face = foc.faceOk === true, m;
+  if (!face && foc.noise < 20)
+    m = { t: 'Wajahmu tidak terdeteksi', d: 'Pastikan kamu ada di depan kamera dan pencahayaan cukup.' };
+  else if (!face)
+    m = { t: 'Kamu terlihat tidak fokus', d: 'Nunduk atau meninggalkan layar? Ayo balik fokus belajarnya!' };
+  else if (foc.noise > 50)
+    m = { t: 'Suara sekitar terlalu berisik', d: 'Coba cari tempat yang lebih tenang agar bisa fokus.' };
+  else
+    m = { t: 'Yuk fokus lagi!', d: 'Tetap semangat belajarnya, kamu pasti bisa!' };
+  $('warn-title').textContent = m.t;
+  $('warn-desc').textContent = m.d;
+  var avg = 0, i;
+  for (i = 0; i < foc.hist.length; i++) avg += foc.hist[i];
+  avg = foc.hist.length ? Math.round(avg / foc.hist.length) : 0;
+  var good = '#34D399', mid = '#fbbf24', bad = '#f87171';
+  var sCol = foc.noise < 30 ? good : foc.noise < 60 ? mid : bad;
+  $('warn-stats').innerHTML =
+    '<span><span style="color:' + (face ? good : bad) + '">&#9679;</span> Wajah ' + (face ? 'ada' : 'tidak ada') + '</span>' +
+    '<span><span style="color:' + sCol + '">&#9679;</span> Suara ' + (foc.noise < 30 ? 'tenang' : foc.noise < 60 ? 'sedang' : 'berisik') + '</span>' +
+    '<span><span style="color:' + (avg > 60 ? good : avg > 30 ? mid : bad) + '">&#9679;</span> Skor ' + avg + '%</span>';
+  $('warn-pop').classList.remove('hide');
+}
+$('warn-ok').addEventListener('click', hideWarn); // dismiss = tutup aja; cooldown tetap jalan
+
 // Pasang AnalyserNode di stream detektor (kamera+mic satu stream — persis alynne.edu).
 function attachNoiseAnalyser(src){
   try{
@@ -2224,6 +2294,24 @@ function noiseLoop(){
     if (foc.hist.length > 20) foc.hist.shift(); // jendela 20 sampel — persis alynne.edu
     session.scoreSum += score;
     session.scoreN++;
+    // Smart warning (alynne.edu): distracted = rata-rata jendela < 35;
+    // bertahan ≥ threshold detik → popup, dikunci 30 dtk antar-popup.
+    var avg = 0, hi;
+    for (hi = 0; hi < foc.hist.length; hi++) avg += foc.hist[hi];
+    avg = foc.hist.length ? avg / foc.hist.length : 100;
+    if (avg < 35){
+      if (!warn.start) warn.start = Date.now();
+      var el = (Date.now() - warn.start) / 1000;
+      var cd = (Date.now() - warn.cooldown) / 1000;
+      if (el >= distractionThresholdSec() && cd > 30){
+        showWarnPopup();
+        warn.start = 0;
+        warn.cooldown = Date.now();
+      }
+    } else {
+      warn.start = 0;
+      warn.cooldown = 0; // pulih → reset penuh (persis alynne.edu)
+    }
   } else {
     foc.noise = 0; // detektor mati → nggak ada pengukuran, nggak ada sampel
   }
@@ -2305,6 +2393,7 @@ function stopCam(){
     foc.stream = null;
   }
   dropMicNoise(); // detektor mati → analyser ikut mati (nggak ada pengukuran nyangkut)
+  warnReset(); // detektor off → tracking gangguan di-reset (persis alynne.edu)
   foc.camOn = false;
   foc.camLost = false;
   foc.faceOk = null;
